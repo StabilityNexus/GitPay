@@ -134,31 +134,53 @@ Premier member of the x402 Foundation.
 
 Every box, no exceptions. Multi-network work does not start until this is a tagged `v1.0.0`.
 
+> **Rewritten 2026-09-14** against the Safe AllowanceModule architecture (`DECISION-LOG.md` §4).
+> The previous version was written for the x402 / EIP-3009 model and listed boxes that the
+> current design can never tick — EIP-712 digest vectors, `AUTH_EXPIRED` expiry tests, and a
+> payout with zero private keys in GitHub Secrets. The allowance model puts a delegate key in CI
+> **on purpose**; the bound on that key is the Safe's period cap, not its absence. A gate that
+> cannot close is not a gate.
+>
+> A tick here means a linked CI run or a linked PR comment, not a recollection.
+
 **Correctness**
-- [ ] Golden vectors pass — domain, digest, signature, recovered address, full calldata
-- [ ] `verify()` passes with the network disabled (I6)
-- [ ] Property test: identical key inputs → identical canonical string (I7)
-- [ ] Mock driver settles end-to-end with zero core changes (§2.2)
+- [ ] Golden vectors pass — encoded calldata, signed raw transaction, transaction hash
+- [ ] `verify()` rejects a mismatched network, recipient and amount, offline (I6)
+- [x] Property test: identical key inputs → identical canonical string (I7)
+- [x] Mock driver settles end-to-end with zero core changes (§2.2)
 
 **Safety**
-- [ ] Settle on testnet, re-run the identical workflow, get **success** + `AUTH_ALREADY_USED` (I8)
-- [ ] Custodial mock driver throws at tier-0 registration (I3)
-- [ ] Driver with `nativeReplayProtection: false` refuses to settle (I9)
-- [ ] `max_per_payout` blocks before any driver is reached (I10)
-- [ ] Kill switch (`settlement.enabled: false`) halts before policy runs
+- [ ] Settle on testnet, re-run the identical workflow, get **success** + `AUTH_ALREADY_USED`
+      from the receipt ledger (I8)
+- [x] Custodial mock driver throws at tier-0 registration (I3)
+- [x] A driver declaring `nativeReplayProtection: false` refuses to settle without a ledger (I9)
+- [x] `max_per_payout` blocks before any driver is reached (I10)
+- [x] Kill switch (`enabled: false`) refuses regardless of the rest of the configuration
+- [x] The ledger entry is written **before** broadcast, and a failure to write it refuses the
+      payout rather than settling unrecorded
+- [ ] A second in-flight delegate transaction is refused, not queued behind the first
 
 **Supply chain**
-- [ ] `npm ls --omit=dev --all` ≤ 2 packages (I11)
-- [ ] `dist/` rebuild is byte-identical to committed (I12)
-- [ ] Layer-boundary grep is clean (I1)
+- [x] `npm ls --omit=dev --all` ≤ 2 packages (I11)
+- [x] `dist/` rebuild is byte-identical to committed (I12)
+- [x] Layer-boundary grep is clean (I1)
 - [ ] SBOM and build provenance published
 
 **Operational**
-- [ ] A real payout settles from an actual PR merge, end to end
-- [ ] 20+ consecutive testnet settlements including deliberate replays and expiries
-- [ ] A fresh repo integrates in under 5 minutes with zero secrets in dry-run
+- [ ] A real payout settles from an actual merged PR, end to end
+- [ ] 20+ consecutive testnet settlements, including deliberate replays of an already-paid key
+- [ ] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
 - [ ] Config schema frozen and published as JSON Schema
 - [ ] `v1.0.0` tagged
+
+**Custody, stated honestly.** This gate does not claim the operator holds no key. It claims the
+key's authority is bounded on-chain and revocable: the delegate can move at most one period's
+allowance, to any address it chooses, until a Safe owner removes it. Size the period cap at what
+you can afford to lose in one period. `DECISION-LOG.md` §6a has the full blast-radius reading.
+
+**Never cut**, whatever else slips: golden vectors · offline verify · the replay test · the I1
+lint · the dry-run default · the tier gate · this gate itself. Those are what make the claim
+"provably correct" rather than "probably fine", and the claim is the deliverable.
 
 **The point of the gate:** every unchecked box is a bug you would otherwise discover on a second
 chain, where you cannot tell whether it is your bug or the chain's. Fix them where the ground is
@@ -173,6 +195,37 @@ firm.
 
 Public facilitators are free today with no published SLA. Design for one disappearing — that is
 what `mode: self` and `mode: auto` exist for.
+
+### 2.6 Per-chain verification protocol
+
+Run this for **every** new network, once the gate in §2.4 is green. It is the reusable artifact
+that makes a fourth chain cost the same as the second. Salvaged from the deleted six-week
+`ROADMAP.md` §6.1 and rewritten for the allowance architecture — the EIP-712 domain checks it
+used to open with no longer apply, because nothing signs a payment authorization any more.
+
+1. **Verify the module deployment first.** The Safe `AllowanceModule` is **not** deployed
+   everywhere — it is absent from Base Sepolia entirely, which is why Ethereum Sepolia is the
+   only active target (`DECISION-LOG.md` §6c). Check `safe-modules-deployments` for the chain,
+   and confirm the address holds code on-chain. Never copy a sibling network's entry.
+2. **Verify the token.** Call `decimals()` on the payout token and check the address against the
+   issuer's own documentation. A wrong `decimals` is a silent factor-of-1000 error in the amount.
+3. **Add a `chains.ts` entry. Nothing else.** If you need to touch any other file, stop and fix
+   the boundary instead. That is the finding, and it is worth more than the chain.
+4. **Confirm the diff.** `git diff --stat` must show no changes under `src/core` or
+   `src/adapters`.
+5. **Dry-run and read the calldata.** Selector `0x4515641a`, **292 bytes** with an empty
+   signature (4 + eight head words + a zero-length `bytes` tail), with the Safe, token, recipient
+   and amount correct in the decoded words.
+6. **Settle the smallest possible amount.**
+7. **Replay test** — re-run the identical inputs, expect success + `AUTH_ALREADY_USED` and the
+   original transaction link, served from the PR receipt ledger.
+8. **Wrong-network negative test** → `DOMAIN_MISMATCH`, using a neighbouring chain's CAIP-2
+   identifier against the same driver.
+9. **Commit a golden vector for this chain** — calldata, signed raw transaction, transaction hash.
+10. **Record the tx hash** in `docs/VERIFIED_CHAINS.md`.
+
+Mainnet only: start below $1, and confirm the Safe's balance moved by exactly the expected amount
+before doing anything larger.
 
 ## 3. Core types
 

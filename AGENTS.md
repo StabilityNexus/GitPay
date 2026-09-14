@@ -321,7 +321,8 @@ Take the interface, never the bet. Agents may propose; humans sign.
 
 ## When stuck
 
-- `ROADMAP.md` — what to build this week, and the test that proves it
+- `ROADMAP-FUTURE.md` — the sanctioned backlog beyond `v1.0.0`. What remains *before* it is the
+  unticked half of the release gate, `REFERENCES.md` §2.4
 - `REFERENCES.md` — verified constants, type definitions, tested primitives, error codes
 - Spec: `github.com/x402-foundation/x402` → `specs/x402-specification-v2.md`,
   `specs/schemes/exact/scheme_exact_evm.md`
