@@ -3,8 +3,11 @@
 
 <!-- Organization Logo -->
 <div align="center" style="display: flex; align-items: center; justify-content: center; gap: 16px;">
-  <img alt="AOSSIE" src="public/aossie-logo.svg" width="175">
-  <img alt="GitPay" src="public/GitPay-logo.png" width="175">
+  <img alt="Stability Nexus" src="public/stability.svg" width="175">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/GitPay-logo-dark.png">
+    <img alt="GitPay" src="public/GitPay-logo.png" width="175">
+  </picture>
 </div>
 
 &nbsp;
