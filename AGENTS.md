@@ -325,7 +325,8 @@ Take the interface, never the bet. Agents may propose; humans sign.
 
 ## When stuck
 
-- `ROADMAP-FUTURE.md` — the sanctioned backlog beyond `v1.0.0`. What remains *before* it is the
+- `ROADMAP.md` — the sanctioned backlog beyond `v1.0.0` (native currency, ERC-721, claim
+  flow) and what is out of scope. What remains *before* it is the
   unticked half of the release gate, `REFERENCES.md` §2.4
 - `REFERENCES.md` — verified constants, type definitions, tested primitives, error codes
 - Spec: `github.com/x402-foundation/x402` → `specs/x402-specification-v2.md`,
