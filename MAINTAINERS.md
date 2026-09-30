@@ -11,7 +11,7 @@ This document lists the individuals fulfilling the key roles of [Maintainer](htt
 
 | Name | GitHub Username | Discord Username | Project / Feature Idea          | Area / Focus         | Proposal / Discussion Link                  |
 | ---- | --------------- | ---------------- | ------------------------------- | -------------------- | ------------------------------------------- |
-| Karun Pacholi | @kpj2006      | @karunpacholi0408  | XOps | x402 implementation & Devops | [Discussions](https://discord.com/channels/1022871757289422898/1458764598562783323) |
+| Karun Pacholi | @kpj2006      | @karunpacholi0408  | GitPay | x402 implementation & Devops | [Discussions](https://discord.com/channels/1022871757289422898/1458764598562783323) |
 
 ## Mentors
 

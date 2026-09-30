@@ -5,7 +5,7 @@ import { SafeAllowanceDriver } from "./drivers/safe-allowance/driver.js";
 import { isMaintainer, parseAssociations, parseSendCommand } from "./adapters/github/trigger.js";
 import { toAtomic } from "./core/amount.js";
 import { DEFAULT_SETTLEMENT_ENABLED, DEFAULT_SETTLEMENT_MODE } from "./core/defaults.js";
-import { XOpsError } from "./core/errors.js";
+import { GitPayError } from "./core/errors.js";
 import { canonical, keyFor } from "./core/idempotency.js";
 import { parseIntent } from "./core/intent.js";
 import { withAliases } from "./core/ledger.js";
@@ -216,7 +216,7 @@ async function run(): Promise<number> {
     requirements,
   );
   if (!verified.isValid) {
-    throw new XOpsError(verified.reason ?? "POLICY_DENIED", "The payout failed verification");
+    throw new GitPayError(verified.reason ?? "POLICY_DENIED", "The payout failed verification");
   }
 
   const response = await registry.settle(
@@ -251,7 +251,7 @@ run().then(
     process.exitCode = code;
   },
   (err: unknown) => {
-    const code = err instanceof XOpsError ? err.code : "";
+    const code = err instanceof GitPayError ? err.code : "";
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
     writeOutputs({ STATUS: "error", TX_HASH: "", EXPLORER_URL: "", ERROR_CODE: code });

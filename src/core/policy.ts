@@ -1,4 +1,4 @@
-import { XOpsError, type ErrorCode } from "./errors.js";
+import { GitPayError, type ErrorCode } from "./errors.js";
 
 /**
  * L1 POLICY. Evaluated offline, before a resolver or a driver is reached.
@@ -20,7 +20,7 @@ export type PolicyConditionName =
 
 /**
  * What the adopter declares. Shaped as a plain record rather than read from
- * inputs directly so that the planned `.xops.yml` loader can produce the same
+ * inputs directly so that the planned `.gitpay.yml` loader can produce the same
  * value without touching the evaluator.
  */
 export interface Policy {
@@ -32,7 +32,7 @@ export interface Policy {
    */
   enabled: boolean;
   /**
-   * I10, in atomic units. Undefined means no XOps-level cap, in which case the
+   * I10, in atomic units. Undefined means no GitPay-level cap, in which case the
    * Safe's own allowance period cap is the only ceiling.
    */
   maxPerPayout: string | undefined;
@@ -152,7 +152,7 @@ export function assertAllowed(decision: PolicyDecision): void {
   const failed = decision.conditions.find((c) => c.status === "fail");
   if (!failed) return;
 
-  throw new XOpsError(CODES[failed.name], `${failed.name}: ${failed.evidence}`, {
+  throw new GitPayError(CODES[failed.name], `${failed.name}: ${failed.evidence}`, {
     condition: failed.name,
     conditions: decision.conditions,
   });

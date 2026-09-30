@@ -14,7 +14,7 @@ const CONTRIBUTOR = "contributor-account";
 async function harness(amount = "2500000") {
   const intent = parseIntent({
     platform: "github",
-    repo: "AOSSIE-Org/xops",
+    repo: "StabilityNexus/GitPay",
     ref: "pull/42",
     actor: "maintainer",
     recipient: CONTRIBUTOR,

@@ -2,11 +2,11 @@
 
 ## Introduction
 
-XOps is a GitHub Action, not a hosted application or service. It runs entirely inside the
+GitPay is a GitHub Action, not a hosted application or service. It runs entirely inside the
 adopting repository's own GitHub Actions runner. The maintaining project (AOSSIE) operates no
-backend, database, or analytics endpoint for XOps, and receives no data from any run of it.
+backend, database, or analytics endpoint for GitPay, and receives no data from any run of it.
 
-## What XOps Processes
+## What GitPay Processes
 
 When a workflow invokes the action, it processes only what that workflow's own configuration and
 repository events provide — for example, an issue/PR comment, a recipient identifier, and an
@@ -24,18 +24,18 @@ The default mode is `dry-run`: no network calls, no secrets, and nothing leaves 
 
 ## Data Storage
 
-XOps does not store data on any server it operates — it has none. Any state (idempotency keys,
+GitPay does not store data on any server it operates — it has none. Any state (idempotency keys,
 receipts) lives only in the adopter's own repository or CI logs, under the adopter's control.
 
 ## Data Sharing
 
-XOps does not sell, share, or use any data for advertising. The only external calls it can make
+GitPay does not sell, share, or use any data for advertising. The only external calls it can make
 are the ones explicitly configured by the adopter (an RPC endpoint or facilitator URL) to
 complete a settlement the adopter requested.
 
 ## On-Chain Data
 
-When `settlement.mode` is not `dry-run`, XOps constructs and may broadcast a transaction on a
+When `settlement.mode` is not `dry-run`, GitPay constructs and may broadcast a transaction on a
 public blockchain (currently Base Sepolia). Transactions on a public blockchain are, by their
 nature, permanently public and visible to anyone — this is inherent to the technology, not a
 choice made by this project.

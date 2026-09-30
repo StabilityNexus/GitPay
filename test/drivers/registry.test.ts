@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { XOpsError } from "../../src/core/errors.js";
+import { GitPayError } from "../../src/core/errors.js";
 import { DriverRegistry } from "../../src/drivers/registry.js";
 import {
   MOCK_NETWORK,
@@ -38,7 +38,7 @@ test("I3: a custodial driver throws at tier-0 registration", () => {
   assert.throws(
     () => registry.register(custodialDriver()),
     (err: unknown) => {
-      assert.ok(err instanceof XOpsError);
+      assert.ok(err instanceof GitPayError);
       assert.equal(err.code, "TIER_VIOLATION");
       assert.match(err.message, /takes custody of funds and cannot run in-process/);
       assert.match(err.message, /mode: facilitator/);

@@ -1,5 +1,5 @@
 {
-  "name": "xops",
+  "name": "gitpay",
   "version": "0.1.0-dev",
   "private": true,
   "description": "CI/CD-native value transfer engine. A repository event produces a payment intent, a human signs it, the workflow settles it.",
@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "bin": {
-    "xops": "dist/cli.js"
+    "gitpay": "dist/cli.js"
   },
   "scripts": {
     "build": "ncc build src/main.ts -o dist",

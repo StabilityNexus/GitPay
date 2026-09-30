@@ -1,4 +1,4 @@
-# Contributing to XOps
+# Contributing to GitPay
 
 ⭐ First off, thank you for considering contributing to this project! ⭐
 
@@ -83,13 +83,13 @@ checks run fully offline.
 
 2. **Clone Your Fork**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/XOps.git
-   cd XOps
+   git clone https://github.com/YOUR_USERNAME/GitPay.git
+   cd GitPay
    ```
 
 3. **Add Upstream Remote**
    ```bash
-   git remote add upstream https://github.com/AOSSIE-Org/XOps.git
+   git remote add upstream https://github.com/StabilityNexus/GitPay.git
    ```
 
 4. **Install Dependencies**
@@ -538,4 +538,4 @@ If you encounter issues not covered here:
 - Check for existing PRs before starting to avoid duplication, as there might PRs that didn't mention the related issue
 
 
-Thank you for contributing to XOps! Your efforts help make this project better for everyone. 🚀
+Thank you for contributing to GitPay! Your efforts help make this project better for everyone. 🚀

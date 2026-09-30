@@ -1,4 +1,4 @@
-# AGENTS.md — XOps
+# AGENTS.md — GitPay
 
 Read this before writing code. Every session. This file is authoritative; if anything
 elsewhere contradicts it, this wins.
@@ -45,7 +45,7 @@ allowance model there is no facilitator, so that reason no longer applies.
 
 ## The thesis
 
-**XOps is an artifact, not a service.** It ships as a versioned GitHub Action that runs in the
+**GitPay is an artifact, not a service.** It ships as a versioned GitHub Action that runs in the
 *adopter's* CI. The maintaining organization operates no server and pays nothing, at any user
 count. If a feature requires us to run something, it is out of scope or it is Tier 2
 (adopter-operated). This is not a preference — it is the reason the project can exist.
@@ -88,7 +88,7 @@ Only the driver owning that scheme may.
 | ID | Rule |
 |---|---|
 | I1 | Core and adapters import no chain libs or chain primitives (lint + CI grep) |
-| I2 | **XOps never holds, pools, or routes funds.** No XOps-operated account exists |
+| I2 | **GitPay never holds, pools, or routes funds.** No GitPay-operated account exists |
 | I3 | Drivers with `needsSecret \|\| custodial` cannot register in Tier 0 — registry throws |
 | I4 | `Intent.recipient` is an opaque `string`, resolved by a resolver. Never `` `0x${string}` `` |
 
@@ -127,7 +127,7 @@ Three things get conflated. Only one is forbidden.
 | Pooled / omnibus balance | a service operator's account | ❌ Tier 2 only |
 
 **Escrow is not custody.** An escrow contract is the adopter's infrastructure, exactly like the
-token contract is. XOps constructs authorizations against it and holds no key to it.
+token contract is. GitPay constructs authorizations against it and holds no key to it.
 
 The boundary that counts is a **network hop to a different legal entity** — not a module split.
 A custodial driver loaded in-process is custody regardless of which file it lives in. That is
@@ -167,7 +167,7 @@ src/core/         types, engine, intent, policy, idempotency, errors, receipt   
 src/resolvers/    identity → PayoutTarget. Ship inline-address; interface for more   ← I1
 src/drivers/      types, registry, exact-eip155/, facilitator/     ← rails live ONLY here
 src/adapters/     github/{trigger,comment,outputs}                 ← I1
-src/cli.ts        npx xops verify|encode|dry-run — offline, no keys
+src/cli.ts        npx gitpay verify|encode|dry-run — offline, no keys
 assets/chains.json
 signer/           static EIP-712 signer → GitHub Pages
 spec/transports/github-actions.md
@@ -217,6 +217,10 @@ export const toNonce = (key: string) =>
   "0x" + Buffer.from(keccak_256(Buffer.from(key))).toString("hex");
 ```
 
+The `xops:` prefix, like the `xops-receipt` marker, predates the rename to GitPay and is kept
+deliberately. Existing receipts carry both. Renaming either would hide every past payout from
+the ledger, and on the allowance rail that means paying it again.
+
 **`amount` is excluded on purpose.** With amount in the key, `/send alice 50` corrected to
 `/send alice 500` yields two keys and Alice receives 550. Excluded, the correction collides and
 requires an explicit `round: 1` — a deliberate, logged act. A coarser key fails recoverably; a
@@ -262,7 +266,7 @@ contract rejects it as used. That rejection is **success** (I8).
   whether the actor may spend — and `undefined` there means "not comment-triggered", which
   **skips** the condition rather than failing it. Treating a missing comment author as "not a
   maintainer" would deny every workflow-configured payout.
-- `.xops.yml` carries `version: 1`. Unknown keys warn, never fail. Never repurpose a key.
+- `.gitpay.yml` carries `version: 1`. Unknown keys warn, never fail. Never repurpose a key.
 
 ---
 

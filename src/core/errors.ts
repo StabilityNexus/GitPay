@@ -59,7 +59,7 @@ export const ERRORS: Record<ErrorCode, ErrorSpec> = {
   },
   DOMAIN_MISMATCH: {
     meaning: "Typed-data domain does not match the asset registry",
-    comment: "Check the network and asset in `.xops.yml`.",
+    comment: "Check the network and asset in `.gitpay.yml`.",
     retry: "no",
     success: false,
   },
@@ -145,13 +145,13 @@ export const ERRORS: Record<ErrorCode, ErrorSpec> = {
   },
 };
 
-export class XOpsError extends Error {
+export class GitPayError extends Error {
   readonly code: ErrorCode;
   readonly details: Record<string, unknown>;
 
   constructor(code: ErrorCode, message?: string, details: Record<string, unknown> = {}) {
     super(message ?? `${code}: ${ERRORS[code].meaning}`);
-    this.name = "XOpsError";
+    this.name = "GitPayError";
     this.code = code;
     this.details = details;
   }

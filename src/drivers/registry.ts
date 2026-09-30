@@ -1,4 +1,4 @@
-import { XOpsError } from "../core/errors.js";
+import { GitPayError } from "../core/errors.js";
 import type { SettlementLedger } from "../core/ledger.js";
 import type { PaymentPayload, PaymentRequirements, SettlementResponse } from "../core/types.js";
 import type {
@@ -32,7 +32,7 @@ export class DriverRegistry {
   register(driver: SettlementDriver): void {
     const { needsSecret, custodial } = driver.capabilities;
     if (this.tier === 0 && (needsSecret || custodial)) {
-      throw new XOpsError("TIER_VIOLATION", tierViolationMessage(driver.id), {
+      throw new GitPayError("TIER_VIOLATION", tierViolationMessage(driver.id), {
         driver: driver.id,
         needsSecret,
         custodial,
@@ -52,7 +52,7 @@ export class DriverRegistry {
   resolve(network: string, scheme: string): SettlementDriver {
     const driver = this.drivers.find((d) => d.supports(network, scheme));
     if (!driver) {
-      throw new XOpsError(
+      throw new GitPayError(
         "DRIVER_NOT_FOUND",
         `No driver registered for scheme "${scheme}" on network "${network}"`,
         { network, scheme, registered: this.drivers.map((d) => d.id) },
@@ -88,7 +88,7 @@ export class DriverRegistry {
     const driver = this.resolve(r.network, r.scheme);
 
     if (!driver.capabilities.nativeReplayProtection && !opts) {
-      throw new XOpsError(
+      throw new GitPayError(
         "NO_REPLAY_PROTECTION",
         `Driver ${driver.id} declares no replay protection, so it cannot settle without a ledger`,
         { driver: driver.id, tier: this.tier },

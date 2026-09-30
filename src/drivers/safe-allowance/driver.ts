@@ -37,7 +37,7 @@ const CAPABILITIES: Capabilities = {
   needsGas: true,
   // CI holds the delegate key, so this cannot register in tier 0 (I3).
   needsSecret: true,
-  // XOps never holds funds; the Safe pays the recipient directly (I2).
+  // GitPay never holds funds; the Safe pays the recipient directly (I2).
   custodial: false,
   /**
    * Honestly false. On the `msg.sender == delegate` path the module checks
