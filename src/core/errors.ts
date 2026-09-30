@@ -59,7 +59,7 @@ export const ERRORS: Record<ErrorCode, ErrorSpec> = {
   },
   DOMAIN_MISMATCH: {
     meaning: "Typed-data domain does not match the asset registry",
-    comment: "Check the network and asset in `.gitpay.yml`.",
+    comment: "Check the `network` and `asset` inputs.",
     retry: "no",
     success: false,
   },

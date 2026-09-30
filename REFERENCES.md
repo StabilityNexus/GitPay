@@ -187,7 +187,9 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
       [`0x7f0340cd…`](https://sepolia.etherscan.io/tx/0x7f0340cd00eb7699279603a62a31b825b872850e09870ae1f8489622b03788e5),
       all on [demo-XOps#1](https://github.com/kpj2006/demo-XOps/pull/1), plus one replay)
 - [ ] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
-- [ ] Config schema frozen and published as JSON Schema
+- [x] Config schema frozen and published as JSON Schema
+      ([`schema/action-inputs.v1.schema.json`](schema/action-inputs.v1.schema.json), kept in step
+      with `action.yml` by `test/manifest.test.ts`)
 - [ ] `v1.0.0` tagged
 
 **Custody, stated honestly.** This gate does not claim the operator holds no key. It claims the
@@ -455,7 +457,7 @@ Core never reads inside `payload`. Only `drivers/exact-eip155` does.
 | `AUTH_EXPIRED` | Past `validBefore` | Re-sign; window is 15 min | user |
 | `AUTH_NOT_YET_VALID` | Before `validAfter` | Clock skew — wait 60 s | auto |
 | `SIGNER_MISMATCH` | Recovered ≠ expected payer | Wrong wallet connected | user |
-| `DOMAIN_MISMATCH` | EIP-712 domain wrong | Check chainId / asset in `.gitpay.yml` | no |
+| `DOMAIN_MISMATCH` | EIP-712 domain wrong | Check the `network` and `asset` inputs | no |
 | `AMOUNT_MISMATCH` | Payload ≠ requirements | Payload was tampered with | no |
 | `RECIPIENT_MISMATCH` | Payload `to` ≠ requirements | Payload was tampered with | no |
 | `IDENTITY_UNRESOLVED` | No resolver matched | Register a wallet or use inline address | user |
@@ -474,36 +476,42 @@ Core never reads inside `payload`. Only `drivers/exact-eip155` does.
 
 ---
 
-## 7. Config schema — `.gitpay.yml`
+## 7. Config schema — the Action's inputs
+
+GitPay is configured by the `with:` block of the step that uses it, and by nothing else. There
+is no `.gitpay.yml`: an earlier draft of this section specified one for the x402 design, and
+policy moved to inputs instead (`DECISION-LOG.md` §12). A second place to configure the same
+policy would be a second place for the two to disagree.
+
+The contract is published as JSON Schema at
+[`schema/action-inputs.v1.schema.json`](schema/action-inputs.v1.schema.json), and **frozen for
+v1**: inputs may be added, but none is removed, renamed or repurposed. `test/manifest.test.ts`
+fails CI if the schema and `action.yml` drift apart in either direction, if a default differs
+between them or fails its own schema, or if the closed sets (`mode`, `scheme`) stop matching the
+code.
 
 ```yaml
-version: 1                          # required; unknown keys warn, never fail
-
-network: eip155:143
-scheme: exact
-asset: USDC
-
-settlement:
-  mode: dry-run                     # dry-run | facilitator | self | auto
-  facilitator_url: https://x402-facilitator.molandak.org
-  # rpc_url: optional — bundled public endpoints used when omitted
-  enabled: true                     # kill switch, honored before policy
-
-policy:
-  approvers: [maintainer, admin]
-  require: [PR_MERGED, TESTS_PASS, MAINTAINER_APPROVED]
-  max_per_payout: "100.00"
-  max_per_day: "500.00"
-
-payout:
-  round: 0
+- uses: StabilityNexus/GitPay@v1
+  with:
+    comment: ${{ github.event.comment.body }}
+    actor_association: ${{ github.event.comment.author_association }}
+    ref: refs/pull/${{ github.event.issue.number }}
+    network: sepolia                  # CAIP-2 or an alias; resolved before anything runs
+    mode: self                        # dry-run (default) | self — anything else is refused
+    enabled: "true"                   # kill switch, evaluated before every other condition
+    allowed_associations: OWNER,MEMBER,COLLABORATOR
+    max_per_payout: "5"               # I10, in /send units: 5 USDC
+    rpc_url: ${{ secrets.GITPAY_RPC_URL }}
+    safe: "0x…"
+    token: "0x…"
+    delegate_key: ${{ secrets.GITPAY_DELEGATE_KEY }}
+    pr: ${{ github.event.issue.number }}
+    github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-**Policy constants** (named only, never an expression language):
-`PR_MERGED` · `TESTS_PASS` · `MAINTAINER_APPROVED` · `COVERAGE_GT_80` ·
-`NO_OPEN_REQUESTED_CHANGES` · `SANCTIONS_CLEAR` (optional, no default provider)
-
-Publish a JSON Schema and validate it in CI.
+**Policy constants** (named only, never an expression language). Built:
+`SETTLEMENT_ENABLED` · `MAINTAINER_APPROVED` · `AMOUNT_WITHIN_CAP`. Planned: `PR_MERGED` ·
+`TESTS_PASS` · `COVERAGE_GT_80`.
 
 ---
 
