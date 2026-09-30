@@ -154,8 +154,14 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 - [x] Mock driver settles end-to-end with zero core changes (§2.2)
 
 **Safety**
-- [ ] Settle on testnet, re-run the identical workflow, get **success** + `AUTH_ALREADY_USED`
-      from the receipt ledger (I8)
+- [x] Settle on testnet, re-run the identical workflow, get **success** + `AUTH_ALREADY_USED`
+      from the receipt ledger (I8). Settled in
+      [run 34028576208](https://github.com/kpj2006/demo-XOps/actions/runs/34028576208)
+      ([receipt](https://github.com/kpj2006/demo-XOps/pull/1#issuecomment-5558730867),
+      [tx](https://sepolia.etherscan.io/tx/0xe3187dcbd62b955965f4ab1395dad337d12b39f0907394bdc68c936b1dac3fce));
+      the identical `/send` re-run in
+      [run 34028666450](https://github.com/kpj2006/demo-XOps/actions/runs/34028666450) logged
+      `already paid — 0xe3187dcb…` and `STATUS = already-paid`, with no second transfer
 - [x] Custodial mock driver throws at tier-0 registration (I3)
 - [x] A driver declaring `nativeReplayProtection: false` refuses to settle without a ledger (I9)
 - [x] `max_per_payout` blocks before any driver is reached (I10)
@@ -174,7 +180,12 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 
 **Operational**
 - [ ] A real payout settles from an actual merged PR, end to end
+      (the three payouts above ran on an open PR; this box needs one after merge)
 - [ ] 20+ consecutive testnet settlements, including deliberate replays of an already-paid key
+      (3 of 20 so far: [`0xe3187dcb…`](https://sepolia.etherscan.io/tx/0xe3187dcbd62b955965f4ab1395dad337d12b39f0907394bdc68c936b1dac3fce),
+      [`0x28f44264…`](https://sepolia.etherscan.io/tx/0x28f442646698ff3da665a55f6d7a3d2e6692003d502d452d75e65e1dafdbbb2e),
+      [`0x7f0340cd…`](https://sepolia.etherscan.io/tx/0x7f0340cd00eb7699279603a62a31b825b872850e09870ae1f8489622b03788e5),
+      all on [demo-XOps#1](https://github.com/kpj2006/demo-XOps/pull/1), plus one replay)
 - [ ] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
 - [ ] Config schema frozen and published as JSON Schema
 - [ ] `v1.0.0` tagged
