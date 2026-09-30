@@ -179,13 +179,14 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 - [ ] SBOM and build provenance published
 
 **Operational**
-- [ ] A real payout settles from an actual merged PR, end to end
-      (the three payouts above ran on an open PR; this box needs one after merge)
-- [ ] 20+ consecutive testnet settlements, including deliberate replays of an already-paid key
-      (3 of 20 so far: [`0xe3187dcb…`](https://sepolia.etherscan.io/tx/0xe3187dcbd62b955965f4ab1395dad337d12b39f0907394bdc68c936b1dac3fce),
-      [`0x28f44264…`](https://sepolia.etherscan.io/tx/0x28f442646698ff3da665a55f6d7a3d2e6692003d502d452d75e65e1dafdbbb2e),
-      [`0x7f0340cd…`](https://sepolia.etherscan.io/tx/0x7f0340cd00eb7699279603a62a31b825b872850e09870ae1f8489622b03788e5),
-      all on [demo-XOps#1](https://github.com/kpj2006/demo-XOps/pull/1), plus one replay)
+- [x] A real payout settles from an actual merged PR, end to end
+      ([`0x75e9a15a…`](https://sepolia.etherscan.io/tx/0x75e9a15aef72365d2ffb4226404904ff953424f0c58e794cc750ceece433f1a7)
+      on the merged [demo-XOps#2](https://github.com/kpj2006/demo-XOps/pull/2),
+      [run](https://github.com/kpj2006/demo-XOps/actions/runs/36790520521))
+- [x] 20+ consecutive testnet settlements, including deliberate replays of an already-paid key
+      (20 in a row with 4 replays on [demo-XOps#3](https://github.com/kpj2006/demo-XOps/pull/3),
+      each checked on-chain; every transaction and run is listed in
+      [`docs/VERIFIED_CHAINS.md`](docs/VERIFIED_CHAINS.md))
 - [ ] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
 - [ ] Config schema frozen and published as JSON Schema
 - [ ] `v1.0.0` tagged
