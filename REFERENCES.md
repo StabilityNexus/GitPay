@@ -146,9 +146,10 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 **Correctness**
 - [x] Golden vectors pass — encoded calldata, signed raw transaction, transaction hash
       (`test/vectors/safe-allowance-eip155-11155111.json`, expected values computed
-      independently with viem; `test/drivers/safe-allowance/vectors.test.ts`)
+      independently with viem; `test/drivers/safe-allowance/vectors.test.ts`; [CI run](https://github.com/StabilityNexus/GitPay/actions/runs/36788274943))
 - [x] `verify()` rejects a mismatched network, recipient and amount, offline (I6)
-      (`test/drivers/safe-allowance/driver.test.ts`, which also asserts zero RPC calls)
+      (`test/drivers/safe-allowance/driver.test.ts`, which also asserts zero RPC calls;
+      [CI run](https://github.com/StabilityNexus/GitPay/actions/runs/36788274943))
 - [x] Property test: identical key inputs → identical canonical string (I7)
 - [x] Mock driver settles end-to-end with zero core changes (§2.2)
 
@@ -163,7 +164,7 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
       payout rather than settling unrecorded
 - [x] A second in-flight delegate transaction is refused, not queued behind the first
       (`test/drivers/safe-allowance/driver.test.ts`: refused before the ledger is written,
-      simulated or broadcast)
+      simulated or broadcast; [CI run](https://github.com/StabilityNexus/GitPay/actions/runs/36788274943))
 
 **Supply chain**
 - [x] `npm ls --omit=dev --all` ≤ 2 packages (I11)
