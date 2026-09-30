@@ -106,9 +106,9 @@ transaction the recipient must send is precisely the friction this project set o
   return a *pending* target for an identity with no known address; a new state in the receipt
   (`pending-claim`, later `claimed`); and a static redemption page, with no backend, in the
   spirit of the signer page already planned for week 5.
-- **Custody is the question to answer first.** I2 today is "XOps never holds funds — the Safe
+- **Custody is the question to answer first.** I2 today is "GitPay never holds funds — the Safe
   pays the recipient directly". With escrow, funds leave the Safe into a contract before anyone
-  is paid. XOps still holds nothing, but the invariant as written no longer describes the system.
+  is paid. GitPay still holds nothing, but the invariant as written no longer describes the system.
   Rewrite it honestly before building, or the first person to read the code finds the gap.
 
 **Open, and all of it load-bearing:**
@@ -130,7 +130,7 @@ for both the grant and the claim.
 
 ## 4. Cross-cutting work these three imply
 
-- **`.xops.yml` schema.** Three payout kinds and two flows will not fit the flat config that one
+- **`.gitpay.yml` schema.** Three payout kinds and two flows will not fit the flat config that one
   kind and one flow fit. Version the schema (`version: 1` is already the plan) and add the
   discriminator before the second kind lands, not after.
 - **Receipt shape.** `pending-claim` is the first non-terminal outcome. Getting that state machine

@@ -1,6 +1,6 @@
-name: "XOps"
+name: "GitPay"
 description: "CI/CD-native value transfer. A repository event produces a payment intent, a human signs it, the workflow settles it."
-author: "AOSSIE-Org"
+author: "StabilityNexus"
 branding:
   icon: "git-merge"
   color: "purple"
@@ -96,7 +96,7 @@ inputs:
       I10. The largest single payout allowed, as a human decimal in the same
       units a `/send` is typed in — "50" means 50 USDC, not 50 atomic units —
       converted with `decimals`. Checked before a driver is reached, so an
-      over-cap payout is never signed. Unset means no XOps-level cap, and the
+      over-cap payout is never signed. Unset means no GitPay-level cap, and the
       Safe's allowance period cap becomes the only ceiling.
     required: false
 
@@ -150,7 +150,7 @@ outputs:
   STATUS:
     description: "dry-run | settled | already-paid | skipped | error"
   ERROR_CODE:
-    description: "Code from the XOps error taxonomy, empty on success."
+    description: "Code from the GitPay error taxonomy, empty on success."
   IDEMPOTENCY_KEY:
     description: "Canonical key this run derived. Identical inputs reproduce it."
 

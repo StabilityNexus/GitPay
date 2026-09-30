@@ -1,7 +1,7 @@
 # Dependabot Configuration
 # Documentation: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
-# XOps is a single Node.js/TypeScript project (npm) that ships as a GitHub Action.
+# GitPay is a single Node.js/TypeScript project (npm) that ships as a GitHub Action.
 # Only the ecosystems actually in use are configured below.
 
 version: 2

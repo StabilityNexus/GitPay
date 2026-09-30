@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 import { DEFAULT_SETTLEMENT_MODE, DEFAULT_SETTLEMENT_ENABLED } from "../../src/core/defaults.js";
-import { ERRORS, ERROR_CODES, XOpsError, isSuccessCode } from "../../src/core/errors.js";
+import { ERRORS, ERROR_CODES, GitPayError, isSuccessCode } from "../../src/core/errors.js";
 
 test("I5: the default settlement mode is dry-run", () => {
   assert.equal(DEFAULT_SETTLEMENT_MODE, "dry-run");
@@ -31,8 +31,8 @@ test("every code carries a comment safe to render in a PR", () => {
   }
 });
 
-test("XOpsError carries the code and structured details, not a stack for humans", () => {
-  const err = new XOpsError("AMOUNT_CAP_EXCEEDED", undefined, { cap: "100.00" });
+test("GitPayError carries the code and structured details, not a stack for humans", () => {
+  const err = new GitPayError("AMOUNT_CAP_EXCEEDED", undefined, { cap: "100.00" });
   assert.equal(err.code, "AMOUNT_CAP_EXCEEDED");
   assert.equal(err.details["cap"], "100.00");
   assert.match(err.message, /AMOUNT_CAP_EXCEEDED/);

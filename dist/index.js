@@ -133,7 +133,7 @@ function writeOutputs(values) {
     const file = process.env["GITHUB_OUTPUT"];
     if (!file)
         return;
-    const delimiter = `XOPS_EOF_${(0,external_node_crypto_namespaceObject.randomUUID)()}`;
+    const delimiter = `GITPAY_EOF_${(0,external_node_crypto_namespaceObject.randomUUID)()}`;
     let block = "";
     for (const [name, value] of Object.entries(values)) {
         block += `${name}<<${delimiter}\n${value ?? ""}\n${delimiter}\n`;
@@ -146,7 +146,7 @@ function writeOutputs(values) {
 /**
  * The PR conversation is the ledger.
  *
- * XOps is an artifact, not a service — there is no server to keep state in, so
+ * GitPay is an artifact, not a service — there is no server to keep state in, so
  * the durable record of "this payout already happened" lives where the payout
  * was requested: as a receipt comment on the pull request. A later run finds it
  * by the canonical idempotency key and settles nothing.
@@ -154,6 +154,9 @@ function writeOutputs(values) {
  * The key is carried in an HTML comment so it is exact and machine-readable,
  * while the visible body stays legible to whoever reads the thread.
  */
+// Keeps the pre-rename spelling on purpose. It is how existing receipts are
+// found, so renaming it would hide every past payout and allow it to be paid
+// again.
 const MARKER = "xops-receipt";
 const MARKER_PATTERN = new RegExp(`<!--\\s*${MARKER}:v1\\s+([^>]*?)\\s*-->`);
 /** Shortens an address for display without losing either end. */
@@ -166,11 +169,11 @@ function receipts_link(base, kind, value) {
         return label;
     return `[${label}](${base.replace(/\/+$/, "")}/${kind}/${value})`;
 }
-const SHARE = "https://github.com/kpj2006/XOps";
-const FOOTER = `<sub>Paid automatically by [XOps](${SHARE}) — open source, runs in your own CI, ` +
+const SHARE = "https://github.com/StabilityNexus/GitPay";
+const FOOTER = `<sub>Paid automatically by [GitPay](${SHARE}) — open source, runs in your own CI, ` +
     `never custodies your funds. ` +
-    `[Share on X](https://x.com/intent/post?text=${encodeURIComponent("Paying open-source contributors straight from a merged PR with XOps")}&url=${SHARE}) · ` +
-    `[Mastodon](https://mastodon.social/share?text=${encodeURIComponent(`XOps — ${SHARE}`)}) · ` +
+    `[Share on X](https://x.com/intent/post?text=${encodeURIComponent("Paying open-source contributors straight from a merged PR with GitPay")}&url=${SHARE}) · ` +
+    `[Mastodon](https://mastodon.social/share?text=${encodeURIComponent(`GitPay — ${SHARE}`)}) · ` +
     `[Reddit](https://reddit.com/submit?url=${SHARE}) · ` +
     `[LinkedIn](https://www.linkedin.com/sharing/share-offsite/?url=${SHARE})</sub>`;
 /**
@@ -206,13 +209,13 @@ function formatReceipt(receipt, context = {}) {
         rows.push(["Settled", receipt.settledAt.replace("T", " ").slice(0, 19) + " UTC"]);
     const lines = [
         marker,
-        `### XOps — payout ${broadcasting ? "broadcasting" : "settled"}`,
+        `### GitPay — payout ${broadcasting ? "broadcasting" : "settled"}`,
         "",
         ...(headline ? [headline, ""] : []),
         ...(rows.length ? ["| | |", "|---|---|", ...rows.map(([k, v]) => `| ${k} | ${v} |`), ""] : []),
         broadcasting
             ? "Written **before** broadcasting, so this transaction may not have landed yet. " +
-                "If it never does, re-run with `round` bumped to pay again deliberately — XOps " +
+                "If it never does, re-run with `round` bumped to pay again deliberately — GitPay " +
                 "will not decide that for you, because paying twice cannot be undone."
             : "Re-running this payout settles nothing — this receipt is its idempotency record.",
         "",
@@ -294,7 +297,7 @@ async function githubJson(url, token) {
             accept: "application/vnd.github+json",
             authorization: `Bearer ${token}`,
             "x-github-api-version": "2022-11-28",
-            "user-agent": "xops",
+            "user-agent": "gitpay",
         },
     });
     if (!response.ok) {
@@ -338,7 +341,7 @@ class PullRequestReceiptLedger {
                 authorization: `Bearer ${this.ref.token}`,
                 "content-type": "application/json",
                 "x-github-api-version": "2022-11-28",
-                "user-agent": "xops",
+                "user-agent": "gitpay",
             },
             body: JSON.stringify({
                 body: formatReceipt({ key, ...entry }, this.ref.context ?? {}),
@@ -4644,7 +4647,7 @@ const CAPABILITIES = {
     needsGas: true,
     // CI holds the delegate key, so this cannot register in tier 0 (I3).
     needsSecret: true,
-    // XOps never holds funds; the Safe pays the recipient directly (I2).
+    // GitPay never holds funds; the Safe pays the recipient directly (I2).
     custodial: false,
     /**
      * Honestly false. On the `msg.sender == delegate` path the module checks
@@ -4907,7 +4910,7 @@ const KNOWN_ASSOCIATIONS = new Set([
  * typo can only ever narrow an allowlist — `OWNERS` matches nobody — so the
  * consequence is a denied payout, never an unintended one. Failing outright
  * would instead break every run the day GitHub adds an association value. This
- * follows the `.xops.yml` convention: unknown keys warn, never fail.
+ * follows the `.gitpay.yml` convention: unknown keys warn, never fail.
  *
  * An empty or blank list falls back to the default. Reading it as "allow
  * nobody" would be defensible, but a blank input is far more likely to be an
@@ -5030,7 +5033,7 @@ const ERRORS = {
     },
     DOMAIN_MISMATCH: {
         meaning: "Typed-data domain does not match the asset registry",
-        comment: "Check the network and asset in `.xops.yml`.",
+        comment: "Check the network and asset in `.gitpay.yml`.",
         retry: "no",
         success: false,
     },
@@ -5114,12 +5117,12 @@ const ERRORS = {
         success: false,
     },
 };
-class XOpsError extends Error {
+class GitPayError extends Error {
     code;
     details;
     constructor(code, message, details = {}) {
         super(message ?? `${code}: ${ERRORS[code].meaning}`);
-        this.name = "XOpsError";
+        this.name = "GitPayError";
         this.code = code;
         this.details = details;
     }
@@ -5154,6 +5157,8 @@ function canonical(k) {
     const recipient = field("recipient", k.recipient).toLowerCase();
     const network = field("network", k.network);
     const asset = field("asset", k.asset);
+    // `xops:` predates the rename to GitPay and stays. Receipts already on PRs
+    // carry keys with this prefix, and a new prefix would never match them.
     return (`xops:v${k.v}|${k.source.platform}:${repo}#${ref}` +
         `|${recipient}|${network}|${asset}|${k.round}`);
 }
@@ -5343,7 +5348,7 @@ function assertAllowed(decision) {
     const failed = decision.conditions.find((c) => c.status === "fail");
     if (!failed)
         return;
-    throw new XOpsError(CODES[failed.name], `${failed.name}: ${failed.evidence}`, {
+    throw new GitPayError(CODES[failed.name], `${failed.name}: ${failed.evidence}`, {
         condition: failed.name,
         conditions: decision.conditions,
     });
@@ -5444,7 +5449,7 @@ class DriverRegistry {
     register(driver) {
         const { needsSecret, custodial } = driver.capabilities;
         if (this.tier === 0 && (needsSecret || custodial)) {
-            throw new XOpsError("TIER_VIOLATION", tierViolationMessage(driver.id), {
+            throw new GitPayError("TIER_VIOLATION", tierViolationMessage(driver.id), {
                 driver: driver.id,
                 needsSecret,
                 custodial,
@@ -5462,7 +5467,7 @@ class DriverRegistry {
     resolve(network, scheme) {
         const driver = this.drivers.find((d) => d.supports(network, scheme));
         if (!driver) {
-            throw new XOpsError("DRIVER_NOT_FOUND", `No driver registered for scheme "${scheme}" on network "${network}"`, { network, scheme, registered: this.drivers.map((d) => d.id) });
+            throw new GitPayError("DRIVER_NOT_FOUND", `No driver registered for scheme "${scheme}" on network "${network}"`, { network, scheme, registered: this.drivers.map((d) => d.id) });
         }
         return driver;
     }
@@ -5486,7 +5491,7 @@ class DriverRegistry {
     async settle(p, r, opts) {
         const driver = this.resolve(r.network, r.scheme);
         if (!driver.capabilities.nativeReplayProtection && !opts) {
-            throw new XOpsError("NO_REPLAY_PROTECTION", `Driver ${driver.id} declares no replay protection, so it cannot settle without a ledger`, { driver: driver.id, tier: this.tier });
+            throw new GitPayError("NO_REPLAY_PROTECTION", `Driver ${driver.id} declares no replay protection, so it cannot settle without a ledger`, { driver: driver.id, tier: this.tier });
         }
         if (!opts)
             return driver.broadcast(await driver.prepare(p, r));
@@ -5579,7 +5584,7 @@ class ResolverChain {
                 return resolver.resolve(identity, ctx);
             }
         }
-        throw new XOpsError("IDENTITY_UNRESOLVED", `No resolver matched "${identity}"`, {
+        throw new GitPayError("IDENTITY_UNRESOLVED", `No resolver matched "${identity}"`, {
             identity,
             tried: this.resolvers.map((r) => r.id),
         });
@@ -5769,7 +5774,7 @@ async function run() {
     const requirements = registry.buildRequirements({ intent, target, idempotencyKey });
     const verified = await driver.verify({ x402Version: 2, scheme: intent.scheme, network: intent.network, payload: {} }, requirements);
     if (!verified.isValid) {
-        throw new XOpsError(verified.reason ?? "POLICY_DENIED", "The payout failed verification");
+        throw new GitPayError(verified.reason ?? "POLICY_DENIED", "The payout failed verification");
     }
     const response = await registry.settle({ x402Version: 2, scheme: intent.scheme, network: intent.network, payload: {} }, requirements, { idempotencyKey, ledger });
     const alreadyPaid = response.errorReason === "AUTH_ALREADY_USED";
@@ -5790,7 +5795,7 @@ async function run() {
 run().then((code) => {
     process.exitCode = code;
 }, (err) => {
-    const code = err instanceof XOpsError ? err.code : "";
+    const code = err instanceof GitPayError ? err.code : "";
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
     writeOutputs({ STATUS: "error", TX_HASH: "", EXPLORER_URL: "", ERROR_CODE: code });

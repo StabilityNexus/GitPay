@@ -1,4 +1,4 @@
-# REFERENCES.md — XOps
+# REFERENCES.md — GitPay
 
 Lookup tables and verified primitives. Every constant here was checked against a primary source
 or produced by a passing test on **15 Aug 2026**. When in doubt, prefer this file over memory.
@@ -257,7 +257,7 @@ export interface SettlementResponse {
   errorReason?: string;
 }
 
-// XOps-local
+// GitPay-local
 export interface Intent {
   source:
     | { platform: "github"; repo: string; ref: string; actor: string }
@@ -438,7 +438,7 @@ Core never reads inside `payload`. Only `drivers/exact-eip155` does.
 | `AUTH_EXPIRED` | Past `validBefore` | Re-sign; window is 15 min | user |
 | `AUTH_NOT_YET_VALID` | Before `validAfter` | Clock skew — wait 60 s | auto |
 | `SIGNER_MISMATCH` | Recovered ≠ expected payer | Wrong wallet connected | user |
-| `DOMAIN_MISMATCH` | EIP-712 domain wrong | Check chainId / asset in `.xops.yml` | no |
+| `DOMAIN_MISMATCH` | EIP-712 domain wrong | Check chainId / asset in `.gitpay.yml` | no |
 | `AMOUNT_MISMATCH` | Payload ≠ requirements | Payload was tampered with | no |
 | `RECIPIENT_MISMATCH` | Payload `to` ≠ requirements | Payload was tampered with | no |
 | `IDENTITY_UNRESOLVED` | No resolver matched | Register a wallet or use inline address | user |
@@ -457,7 +457,7 @@ Core never reads inside `payload`. Only `drivers/exact-eip155` does.
 
 ---
 
-## 7. Config schema — `.xops.yml`
+## 7. Config schema — `.gitpay.yml`
 
 ```yaml
 version: 1                          # required; unknown keys warn, never fail
@@ -502,7 +502,7 @@ jobs:
     if: startsWith(github.event.comment.body, '/send')
     runs-on: ubuntu-latest
     steps:
-      - uses: AOSSIE-Org/xops@v1
+      - uses: StabilityNexus/GitPay@v1
 ```
 
 No `secrets:` block on the default path. Verify `GITHUB_TOKEN` inheritance in `workflow_call`

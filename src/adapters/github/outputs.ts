@@ -16,7 +16,7 @@ export function writeOutputs(values: Partial<Record<OutputName, string>>): void 
   const file = process.env["GITHUB_OUTPUT"];
   if (!file) return;
 
-  const delimiter = `XOPS_EOF_${randomUUID()}`;
+  const delimiter = `GITPAY_EOF_${randomUUID()}`;
   let block = "";
   for (const [name, value] of Object.entries(values)) {
     block += `${name}<<${delimiter}\n${value ?? ""}\n${delimiter}\n`;

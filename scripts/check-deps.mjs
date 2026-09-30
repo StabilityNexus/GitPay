@@ -4,7 +4,7 @@
 
 import { execFileSync } from "node:child_process";
 
-const LIMIT = Number(process.env["XOPS_DEP_LIMIT"] ?? 2);
+const LIMIT = Number(process.env["GITPAY_DEP_LIMIT"] ?? 2);
 
 const raw = execFileSync("npm", ["ls", "--omit=dev", "--all", "--json"], {
   encoding: "utf8",

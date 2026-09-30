@@ -4,7 +4,7 @@
 <!-- Organization Logo -->
 <div align="center" style="display: flex; align-items: center; justify-content: center; gap: 16px;">
   <img alt="AOSSIE" src="public/aossie-logo.svg" width="175">
-  <img alt="XOps" src="public/XOps-logo.png" width="175">
+  <img alt="GitPay" src="public/GitPay-logo.png" width="175">
 </div>
 
 &nbsp;
@@ -33,12 +33,12 @@
 </p>
 
 <p align="center">
-  <a href="https://scorecard.dev/viewer/?uri=github.com/AOSSIE-Org/XOps">
-    <img src="https://api.scorecard.dev/projects/github.com/AOSSIE-Org/XOps/badge" alt="OpenSSF Scorecard"/>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/StabilityNexus/GitPay">
+    <img src="https://api.scorecard.dev/projects/github.com/StabilityNexus/GitPay/badge" alt="OpenSSF Scorecard"/>
   </a>
   &nbsp;&nbsp;
   <a href="./BestPracticesChecklist.md">
-    <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FAOSSIE-Org%2FXOps%2Fmain%2Fchecklist-status.json&query=%24.percent&suffix=%25&label=Best%20Practices&logo=openssf" alt="Best Practices"/>
+    <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FStabilityNexus%2FGitPay%2Fmain%2Fchecklist-status.json&query=%24.percent&suffix=%25&label=Best%20Practices&logo=openssf" alt="Best Practices"/>
   </a>
   &nbsp;&nbsp;
   <a href="https://github.com/gitleaks/gitleaks">
@@ -49,10 +49,10 @@
 ---
 
 <div align="center">
-<h1>XOps</h1>
+<h1>GitPay</h1>
 </div>
 
-**XOps** is a CI/CD-native value transfer engine, shipped as a versioned GitHub Action. A
+**GitPay** is a CI/CD-native value transfer engine, shipped as a versioned GitHub Action. A
 repository event (e.g. a merged PR) produces a payment intent, a human signs it, the workflow
 settles it on-chain, and a receipt is posted back — with no server operated by the project and no
 secrets required in the default configuration.
@@ -61,7 +61,7 @@ secrets required in the default configuration.
 
 ## 🚀 Features
 
-- **Runs in your CI, not ours** — ships as a GitHub Action (`uses: AOSSIE-Org/xops@v1`); the
+- **Runs in your CI, not ours** — ships as a GitHub Action (`uses: StabilityNexus/GitPay@v1`); the
   maintaining project operates no backend and never holds funds.
 - **Safe by default** — `mode: dry-run` unless explicitly opted out; a fresh integration needs
   zero secrets.
@@ -85,13 +85,13 @@ secrets required in the default configuration.
 - **Protocol:** [x402 v2](https://github.com/x402-foundation/x402) — `exact` scheme, EIP-3009 /
   EIP-712, CAIP-2 network identifiers
 - **Chain (Tier 1 target):** Base Sepolia, USDC — see `assets/chains.json`
-- **CLI:** `npx xops verify | encode` — fully offline, no keys or network required
+- **CLI:** `npx gitpay verify | encode` — fully offline, no keys or network required
 
 ---
 
 ## 🔗 Repository Links
 
-- [Main Repository](https://github.com/AOSSIE-Org/XOps)
+- [Main Repository](https://github.com/StabilityNexus/GitPay)
 
 ---
 
@@ -133,14 +133,14 @@ jobs:
     if: startsWith(github.event.comment.body, '/send')
     runs-on: ubuntu-latest
     steps:
-      - uses: AOSSIE-Org/xops@v1
+      - uses: StabilityNexus/GitPay@v1
 ```
 
 ### Developing Locally
 
 ```bash
-git clone https://github.com/AOSSIE-Org/XOps.git
-cd XOps
+git clone https://github.com/StabilityNexus/GitPay.git
+cd GitPay
 npm install
 npm run check   # lint + layer-boundary check + dependency-count check + tests
 ```
@@ -173,8 +173,8 @@ See the [LICENSE](LICENSE) file for details.
 
 ## 💪 Thanks To All Contributors
 
-Thanks a lot for spending your time helping XOps grow. Keep rocking 🥂
+Thanks a lot for spending your time helping GitPay grow. Keep rocking 🥂
 
-[![Contributors](https://contrib.rocks/image?repo=AOSSIE-Org/XOps)](https://github.com/AOSSIE-Org/XOps/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=StabilityNexus/GitPay)](https://github.com/StabilityNexus/GitPay/graphs/contributors)
 
 © 2026 AOSSIE

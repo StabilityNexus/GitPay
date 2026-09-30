@@ -1,4 +1,4 @@
-import { XOpsError } from "../core/errors.js";
+import { GitPayError } from "../core/errors.js";
 import type { PayoutTarget } from "../core/types.js";
 import type { Resolver, ResolveContext } from "./types.js";
 
@@ -23,7 +23,7 @@ export class ResolverChain {
         return resolver.resolve(identity, ctx);
       }
     }
-    throw new XOpsError("IDENTITY_UNRESOLVED", `No resolver matched "${identity}"`, {
+    throw new GitPayError("IDENTITY_UNRESOLVED", `No resolver matched "${identity}"`, {
       identity,
       tried: this.resolvers.map((r) => r.id),
     });

@@ -5,7 +5,7 @@
 
 version: 2
 
-project_name: xops
+project_name: gitpay
 
 # before:
 #   hooks:
@@ -172,7 +172,7 @@ sboms:
 release:                      # Release metadata and GitHub release configuration
   github:
     owner: AOSSIE-Org
-    name: XOps
+    name: GitPay
   # Make release a draft first so maintainer can review before publishing
   draft: false
   # Set to true to mark as a pre-release if version has a pre-release tag (e.g. v1.0.0-beta.1)

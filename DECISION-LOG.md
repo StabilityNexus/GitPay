@@ -15,7 +15,10 @@ when resuming.
 GitPay. The latter is clearer"). It is *not* GitHub-specific — GitHub, GitLab and Bitbucket all
 use Git — so it survives if the project ever expands, without being speculative now.
 
-Repo/package still say `xops`. Rename is pending, not done.
+✅ **Done (2026-10-01).** The repo moved to `StabilityNexus/GitPay`, and the package, CLI,
+Action and docs are renamed. Two identifiers keep the old spelling on purpose: the `xops:v1`
+idempotency key prefix and the `xops-receipt` marker. Existing receipts carry both, and
+renaming them would make past payouts payable again.
 
 ---
 

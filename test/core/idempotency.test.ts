@@ -6,7 +6,7 @@ import type { IdempotencyKey, Intent } from "../../src/core/types.js";
 
 function intent(overrides: Partial<Intent> = {}): Intent {
   return {
-    source: { platform: "github", repo: "AOSSIE-Org/xops", ref: "pull/42", actor: "maintainer" },
+    source: { platform: "github", repo: "StabilityNexus/GitPay", ref: "pull/42", actor: "maintainer" },
     recipient: "0xF39FD6E51AAD88F6F4CE6AB8827279CFFFB92266",
     amount: "2500000",
     asset: "USDC",
@@ -35,7 +35,7 @@ test("I7: identical inputs produce an identical string", () => {
       v: 1,
       source: {
         platform: pick(["github", "gitlab"]),
-        repo: pick(["a/b", "AOSSIE-Org/xops", "org/repo-with-dash"]),
+        repo: pick(["a/b", "StabilityNexus/GitPay", "org/repo-with-dash"]),
         ref: pick(["pull/1", "pull/42", "refs/heads/main"]),
       },
       recipient: pick(["0xabc", "0xABC", "alice.eth"]),

@@ -21,6 +21,8 @@ export function canonical(k: IdempotencyKey): string {
   const recipient = field("recipient", k.recipient).toLowerCase();
   const network = field("network", k.network);
   const asset = field("asset", k.asset);
+  // `xops:` predates the rename to GitPay and stays. Receipts already on PRs
+  // carry keys with this prefix, and a new prefix would never match them.
   return (
     `xops:v${k.v}|${k.source.platform}:${repo}#${ref}` +
     `|${recipient}|${network}|${asset}|${k.round}`

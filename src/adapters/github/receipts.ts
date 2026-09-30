@@ -3,7 +3,7 @@ import type { LedgerEntry, PayoutContext, SettlementLedger } from "../../core/le
 /**
  * The PR conversation is the ledger.
  *
- * XOps is an artifact, not a service — there is no server to keep state in, so
+ * GitPay is an artifact, not a service — there is no server to keep state in, so
  * the durable record of "this payout already happened" lives where the payout
  * was requested: as a receipt comment on the pull request. A later run finds it
  * by the canonical idempotency key and settles nothing.
@@ -12,6 +12,9 @@ import type { LedgerEntry, PayoutContext, SettlementLedger } from "../../core/le
  * while the visible body stays legible to whoever reads the thread.
  */
 
+// Keeps the pre-rename spelling on purpose. It is how existing receipts are
+// found, so renaming it would hide every past payout and allow it to be paid
+// again.
 const MARKER = "xops-receipt";
 const MARKER_PATTERN = new RegExp(`<!--\\s*${MARKER}:v1\\s+([^>]*?)\\s*-->`);
 
@@ -30,14 +33,14 @@ function link(base: string | undefined, kind: "tx" | "address", value: string): 
   return `[${label}](${base.replace(/\/+$/, "")}/${kind}/${value})`;
 }
 
-const SHARE = "https://github.com/kpj2006/XOps";
+const SHARE = "https://github.com/StabilityNexus/GitPay";
 const FOOTER =
-  `<sub>Paid automatically by [XOps](${SHARE}) — open source, runs in your own CI, ` +
+  `<sub>Paid automatically by [GitPay](${SHARE}) — open source, runs in your own CI, ` +
   `never custodies your funds. ` +
   `[Share on X](https://x.com/intent/post?text=${encodeURIComponent(
-    "Paying open-source contributors straight from a merged PR with XOps",
+    "Paying open-source contributors straight from a merged PR with GitPay",
   )}&url=${SHARE}) · ` +
-  `[Mastodon](https://mastodon.social/share?text=${encodeURIComponent(`XOps — ${SHARE}`)}) · ` +
+  `[Mastodon](https://mastodon.social/share?text=${encodeURIComponent(`GitPay — ${SHARE}`)}) · ` +
   `[Reddit](https://reddit.com/submit?url=${SHARE}) · ` +
   `[LinkedIn](https://www.linkedin.com/sharing/share-offsite/?url=${SHARE})</sub>`;
 
@@ -75,13 +78,13 @@ export function formatReceipt(receipt: Receipt, context: PayoutContext = {}): st
 
   const lines = [
     marker,
-    `### XOps — payout ${broadcasting ? "broadcasting" : "settled"}`,
+    `### GitPay — payout ${broadcasting ? "broadcasting" : "settled"}`,
     "",
     ...(headline ? [headline, ""] : []),
     ...(rows.length ? ["| | |", "|---|---|", ...rows.map(([k, v]) => `| ${k} | ${v} |`), ""] : []),
     broadcasting
       ? "Written **before** broadcasting, so this transaction may not have landed yet. " +
-        "If it never does, re-run with `round` bumped to pay again deliberately — XOps " +
+        "If it never does, re-run with `round` bumped to pay again deliberately — GitPay " +
         "will not decide that for you, because paying twice cannot be undone."
       : "Re-running this payout settles nothing — this receipt is its idempotency record.",
     "",
@@ -186,7 +189,7 @@ async function githubJson(url: string, token: string): Promise<CommentLike[]> {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${token}`,
       "x-github-api-version": "2022-11-28",
-      "user-agent": "xops",
+      "user-agent": "gitpay",
     },
   });
   if (!response.ok) {
@@ -235,7 +238,7 @@ export class PullRequestReceiptLedger implements SettlementLedger {
         authorization: `Bearer ${this.ref.token}`,
         "content-type": "application/json",
         "x-github-api-version": "2022-11-28",
-        "user-agent": "xops",
+        "user-agent": "gitpay",
       },
       body: JSON.stringify({
         body: formatReceipt({ key, ...entry }, this.ref.context ?? {}),

@@ -60,7 +60,7 @@ test("I1: core may not import a driver", async () => {
 });
 
 test("the boundary grep catches primitives no import rule would see", () => {
-  const dir = mkdtempSync(join(tmpdir(), "xops-i1-"));
+  const dir = mkdtempSync(join(tmpdir(), "gitpay-i1-"));
   try {
     mkdirSync(join(dir, "core"), { recursive: true });
     writeFileSync(
@@ -85,7 +85,7 @@ test("the boundary grep catches primitives no import rule would see", () => {
 });
 
 test("the boundary grep catches dynamic imports, which the lint rule does not inspect", () => {
-  const dir = mkdtempSync(join(tmpdir(), "xops-i1-"));
+  const dir = mkdtempSync(join(tmpdir(), "gitpay-i1-"));
   try {
     mkdirSync(join(dir, "core"), { recursive: true });
     writeFileSync(
