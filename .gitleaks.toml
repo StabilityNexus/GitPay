@@ -1,0 +1,18 @@
+# Default gitleaks rules, plus an allowlist of exact values that are public by
+# design. It lists values, never paths, so a real key committed next to these
+# in a test is still caught.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Known-public test values used by golden vectors and driver tests"
+regexTarget = "secret"
+regexes = [
+  # Anvil / Hardhat test account #0. Published in the Foundry and Hardhat docs
+  # and never funded on a real network. Also listed in REFERENCES.md.
+  '''^(0x)?ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80$''',
+  # Circle's USDC token contract on Ethereum Sepolia. A contract address, not a
+  # secret; flagged only because the field holding it is named `token`.
+  '''(?i)^(0x)?1c7d4b196cb0c7b01d743fbc6116a902379c7238$''',
+]
