@@ -186,7 +186,13 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
       [`0x28f44264…`](https://sepolia.etherscan.io/tx/0x28f442646698ff3da665a55f6d7a3d2e6692003d502d452d75e65e1dafdbbb2e),
       [`0x7f0340cd…`](https://sepolia.etherscan.io/tx/0x7f0340cd00eb7699279603a62a31b825b872850e09870ae1f8489622b03788e5),
       all on [demo-XOps#1](https://github.com/kpj2006/demo-XOps/pull/1), plus one replay)
-- [ ] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
+- [x] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
+      ([kpj2006/gitpay-quickstart](https://github.com/kpj2006/gitpay-quickstart): one file, three
+      inputs, no secrets; 27 s from adding the workflow to a green dry-run,
+      [run 36793374394](https://github.com/kpj2006/gitpay-quickstart/actions/runs/36793374394).
+      The first attempt used the README snippet verbatim and failed with
+      [`Missing required intent field: recipient`](https://github.com/kpj2006/gitpay-quickstart/actions/runs/36792964834),
+      which is why the README's snippet was rewritten)
 - [ ] Config schema frozen and published as JSON Schema
 - [ ] `v1.0.0` tagged
 
