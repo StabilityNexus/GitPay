@@ -4909,8 +4909,7 @@ const KNOWN_ASSOCIATIONS = new Set([
  * An unrecognized entry **warns and is kept** rather than failing the run. A
  * typo can only ever narrow an allowlist — `OWNERS` matches nobody — so the
  * consequence is a denied payout, never an unintended one. Failing outright
- * would instead break every run the day GitHub adds an association value. This
- * follows the `.gitpay.yml` convention: unknown keys warn, never fail.
+ * would instead break every run the day GitHub adds an association value.
  *
  * An empty or blank list falls back to the default. Reading it as "allow
  * nobody" would be defensible, but a blank input is far more likely to be an
@@ -4979,6 +4978,20 @@ function toAtomic(human, decimals) {
 ;// CONCATENATED MODULE: ./src/core/defaults.ts
 /** I5. Real settlement is always an explicit opt-in. */
 const DEFAULT_SETTLEMENT_MODE = "dry-run";
+/** The modes this build can run. `facilitator` and `auto` are specified, not built. */
+const SUPPORTED_SETTLEMENT_MODES = ["dry-run", "self"];
+/**
+ * I5 again. The check has to be "is this a mode we know", never "is this not
+ * dry-run": read the second way, a typo such as `dryrun` settles real money,
+ * and a typo is not an explicit opt-in.
+ */
+function parseSettlementMode(value) {
+    const mode = (value ?? DEFAULT_SETTLEMENT_MODE).trim();
+    if (SUPPORTED_SETTLEMENT_MODES.includes(mode)) {
+        return mode;
+    }
+    throw new Error(`Unknown mode "${mode}". Use "dry-run", or "self" to settle for real. Nothing was settled.`);
+}
 /** Kill switch default. Honored before policy evaluation. */
 const DEFAULT_SETTLEMENT_ENABLED = true;
 /** Clock-skew allowance and authorization window, in seconds. */
@@ -5033,7 +5046,7 @@ const ERRORS = {
     },
     DOMAIN_MISMATCH: {
         meaning: "Typed-data domain does not match the asset registry",
-        comment: "Check the network and asset in `.gitpay.yml`.",
+        comment: "Check the `network` and `asset` inputs.",
         retry: "no",
         success: false,
     },
@@ -5608,6 +5621,9 @@ class ResolverChain {
 
 
 async function run() {
+    // First, before anything is parsed or resolved: an unknown mode is refused
+    // rather than read as "not dry-run", which would settle on a typo (I5).
+    const mode = parseSettlementMode(readInput("mode"));
     // L0 TRIGGER. A comment body, when given, is the source of truth for who gets
     // paid and how much — it beats the workflow's static inputs, because a person
     // typed it deliberately.
@@ -5698,7 +5714,6 @@ async function run() {
     console.log("payout target:");
     console.log(JSON.stringify(target, null, 2));
     console.log(`idempotency key: ${idempotencyKey}`);
-    const mode = readInput("mode") ?? DEFAULT_SETTLEMENT_MODE;
     if (mode === "dry-run") {
         console.log("mode: dry-run — nothing was settled.");
         writeOutputs({ STATUS: "dry-run", IDEMPOTENCY_KEY: idempotencyKey, ERROR_CODE: "" });

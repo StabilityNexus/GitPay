@@ -266,7 +266,9 @@ contract rejects it as used. That rejection is **success** (I8).
   whether the actor may spend — and `undefined` there means "not comment-triggered", which
   **skips** the condition rather than failing it. Treating a missing comment author as "not a
   maintainer" would deny every workflow-configured payout.
-- `.gitpay.yml` carries `version: 1`. Unknown keys warn, never fail. Never repurpose a key.
+- Configuration is the Action's inputs, frozen for v1 in `schema/action-inputs.v1.schema.json`.
+  An input may be added, never removed, renamed or repurposed. An unknown *value* in a list
+  (such as `allowed_associations`) warns, never fails.
 
 ---
 

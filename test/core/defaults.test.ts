@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
-import { DEFAULT_SETTLEMENT_MODE, DEFAULT_SETTLEMENT_ENABLED } from "../../src/core/defaults.js";
+import {
+  DEFAULT_SETTLEMENT_ENABLED,
+  DEFAULT_SETTLEMENT_MODE,
+  parseSettlementMode,
+} from "../../src/core/defaults.js";
 import { ERRORS, ERROR_CODES, GitPayError, isSuccessCode } from "../../src/core/errors.js";
 
 test("I5: the default settlement mode is dry-run", () => {
@@ -15,6 +19,18 @@ test("I5: the action declares dry-run as its default too", () => {
   const mode = /mode:\s*[\s\S]*?default:\s*"([^"]+)"/.exec(action);
   assert.ok(mode, "action.yml must declare a mode input with a default");
   assert.equal(mode[1], "dry-run");
+});
+
+test("I5: an unset mode is dry-run, and only known modes are accepted", () => {
+  assert.equal(parseSettlementMode(undefined), "dry-run");
+  assert.equal(parseSettlementMode("dry-run"), "dry-run");
+  assert.equal(parseSettlementMode(" self "), "self");
+});
+
+test("I5: a mistyped mode is refused, never read as 'not dry-run' and settled", () => {
+  for (const typo of ["dryrun", "dry_run", "Dry-Run", "test", "facilitator", "auto"]) {
+    assert.throws(() => parseSettlementMode(typo), /Unknown mode .*Nothing was settled/, typo);
+  }
 });
 
 test("I8: AUTH_ALREADY_USED is the only success code", () => {

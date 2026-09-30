@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/StabilityNexus/GitPay/main/schema/action-inputs.v1.schema.json",
+  "title": "GitPay Action inputs, v1",
+  "description": "The `with:` block of a workflow step that uses StabilityNexus/GitPay@v1. GitHub passes every input as a string. Frozen for v1: an input may be added, but none is removed, renamed or repurposed. test/manifest.test.ts keeps this file and action.yml in step. Values are checked as GitPay receives them, after GitHub has resolved any `${{ }}` expression.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "comment": {
+      "type": "string",
+      "description": "A PR comment body to read a `/send <recipient> <amount> [asset]` command from. Overrides `recipient`, `amount` and `asset`."
+    },
+    "actor_association": {
+      "type": "string",
+      "pattern": "^[A-Za-z_]+$",
+      "description": "GitHub's author_association for the comment author. Required whenever `comment` is used."
+    },
+    "decimals": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "default": "6",
+      "description": "Decimals of the asset, used to convert a `/send` amount to atomic units."
+    },
+    "repo": {
+      "type": "string",
+      "pattern": "^[^|#\\s]+$",
+      "description": "Overrides GITHUB_REPOSITORY in the intent source and the idempotency key."
+    },
+    "ref": {
+      "type": "string",
+      "pattern": "^[^|\\s]+$",
+      "description": "Overrides GITHUB_REF in the idempotency key. Use `refs/pull/<number>` on issue_comment events."
+    },
+    "actor": {
+      "type": "string",
+      "description": "Overrides GITHUB_ACTOR in the intent source."
+    },
+    "recipient": {
+      "type": "string",
+      "pattern": "^[^|\\s]+$",
+      "description": "Opaque payout identity: an inline address, or anything a resolver understands (I4)."
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Atomic units. USDC has 6 decimals, so 2500000 is 2.50 USDC."
+    },
+    "asset": {
+      "type": "string",
+      "pattern": "^[^|\\s]+$",
+      "default": "USDC",
+      "description": "Opaque asset identifier."
+    },
+    "network": {
+      "type": "string",
+      "pattern": "^([-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}|[a-z][a-z0-9-]*)$",
+      "default": "eip155:11155111",
+      "description": "CAIP-2 network identifier, or an alias (`sepolia`) that resolves to one before anything else runs."
+    },
+    "scheme": {
+      "type": "string",
+      "enum": ["allowance"],
+      "default": "allowance",
+      "description": "Settlement scheme. `allowance` settles through Safe's AllowanceModule and is the only one built."
+    },
+    "round": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "default": "0",
+      "description": "Bump to deliberately re-pay the same recipient for the same ref."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["dry-run", "self"],
+      "default": "dry-run",
+      "description": "I5. `self` settles for real. Anything else is refused, never read as a real run."
+    },
+    "enabled": {
+      "type": "string",
+      "enum": ["true", "false"],
+      "default": "true",
+      "description": "Kill switch. \"false\" refuses every payout, before any other condition."
+    },
+    "allowed_associations": {
+      "type": "string",
+      "pattern": "^\\s*[A-Za-z_]+(\\s*,\\s*[A-Za-z_]+)*\\s*$",
+      "default": "OWNER,MEMBER,COLLABORATOR",
+      "description": "Comma-separated author_association values permitted to spend via `/send`."
+    },
+    "max_per_payout": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "I10. Largest single payout, as a human decimal in `/send` units: \"50\" is 50 USDC. Unset means no GitPay-level cap."
+    },
+    "rpc_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "JSON-RPC endpoint for the network. Needed when mode is `self`."
+    },
+    "chain_id": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Numeric chain id. Derived from `network` for registry networks; set only for one that is not."
+    },
+    "safe": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "Address of the Safe holding the funds. Needed when mode is `self`."
+    },
+    "token": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "ERC-20 contract being paid out. Needed when mode is `self`."
+    },
+    "allowance_module": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "AllowanceModule deployment. Derived from `network`; set only to point at another deployment."
+    },
+    "delegate_key": {
+      "type": "string",
+      "pattern": "^(0x)?[0-9a-fA-F]{64}$",
+      "description": "Private key of the spending-limit delegate. Pass from a secret, never inline. Needed when mode is `self`."
+    },
+    "explorer_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Block explorer base used to link receipts. Derived from `network`."
+    },
+    "pr": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Pull request number whose comments hold the payout receipts. Needed when mode is `self`."
+    },
+    "github_token": {
+      "type": "string",
+      "description": "Token used to read and write the receipt comment. Needed when mode is `self`."
+    }
+  }
+}
