@@ -1,0 +1,159 @@
+name: "XOps"
+description: "CI/CD-native value transfer. A repository event produces a payment intent, a human signs it, the workflow settles it."
+author: "AOSSIE-Org"
+branding:
+  icon: "git-merge"
+  color: "purple"
+
+inputs:
+  comment:
+    description: >
+      A PR comment body to read a `/send <recipient> <amount> [asset]` command from.
+      When given, the command overrides the `recipient`, `amount` and `asset` inputs,
+      and the amount is treated as human decimal rather than atomic units. A comment
+      with no `/send` line reports STATUS=skipped and does nothing.
+    required: false
+  actor_association:
+    description: >
+      GitHub's author_association for the comment author. `/send` is denied unless
+      it is one of `allowed_associations`. Required whenever `comment` is used.
+    required: false
+  decimals:
+    description: "Decimals for the asset, used to convert a `/send` amount to atomic units."
+    required: false
+    default: "6"
+  repo:
+    description: "Overrides GITHUB_REPOSITORY in the intent source."
+    required: false
+  ref:
+    description: >
+      Overrides GITHUB_REF in the intent source, and therefore in the idempotency key.
+      Set this on issue_comment events: GITHUB_REF points at the default branch there,
+      and refs/pull/N/merge changes on every push, so neither identifies a payout stably.
+      `refs/pull/<number>` does.
+    required: false
+  actor:
+    description: "Overrides GITHUB_ACTOR in the intent source."
+    required: false
+  recipient:
+    description: "Opaque payout identity. An inline address, or anything a resolver understands."
+    required: false
+  amount:
+    description: "Atomic units, as a string. USDC has 6 decimals, so 2500000 is 2.50 USDC."
+    required: false
+  asset:
+    description: "Opaque asset identifier from the chain registry."
+    required: false
+    default: "USDC"
+  network:
+    description: >
+      CAIP-2 network identifier, or a friendly alias for one (`sepolia`). An alias
+      is resolved to its CAIP-2 form before anything else runs, so the canonical
+      spelling is what reaches the intent, the idempotency key and the receipt —
+      two spellings of one chain would be two keys, and the same payout could
+      settle twice. A network in the chain registry also supplies `chain_id`,
+      `allowance_module` and `explorer_url`, so a workflow need not repeat them.
+    required: false
+    default: "eip155:11155111"
+  scheme:
+    description: >
+      Settlement scheme. `allowance` is the only one implemented — it settles via
+      Safe's AllowanceModule. Was `exact` (x402 over EIP-3009) before the pivot;
+      that default shipped with no driver behind it, so every real settlement
+      failed with DRIVER_NOT_FOUND.
+    required: false
+    default: "allowance"
+  round:
+    description: "Bump to deliberately re-pay the same recipient for the same ref."
+    required: false
+    default: "0"
+  mode:
+    description: "dry-run | self. Real settlement is always explicit."
+    required: false
+    default: "dry-run"
+
+  # L1 POLICY. Declared here, evaluated offline before anything is resolved or
+  # signed, and reported as a per-condition table in the log on every run.
+  enabled:
+    description: >
+      Kill switch. Set to "false" to refuse every payout outright, whatever the
+      rest of the configuration says. Evaluated before every other condition.
+      Distinct from `mode: dry-run`, which still resolves the payout and reports
+      what would have happened.
+    required: false
+    default: "true"
+  allowed_associations:
+    description: >
+      Comma-separated GitHub author_association values permitted to spend via
+      `/send`, e.g. "OWNER,MEMBER". Applies only to comment-triggered runs — a
+      workflow-configured payout needs no comment author, because editing the
+      workflow already requires write access. An unrecognized value warns and is
+      kept: a typo can only narrow the allowlist, never widen it.
+    required: false
+    default: "OWNER,MEMBER,COLLABORATOR"
+  max_per_payout:
+    description: >
+      I10. The largest single payout allowed, as a human decimal in the same
+      units a `/send` is typed in — "50" means 50 USDC, not 50 atomic units —
+      converted with `decimals`. Checked before a driver is reached, so an
+      over-cap payout is never signed. Unset means no XOps-level cap, and the
+      Safe's allowance period cap becomes the only ceiling.
+    required: false
+
+  # Everything below is needed only when mode is not dry-run.
+  rpc_url:
+    description: "JSON-RPC endpoint for the network."
+    required: false
+  chain_id:
+    description: >
+      Numeric chain id, e.g. 11155111 for Ethereum Sepolia. Derived from `network`
+      when that network is in the chain registry; pass it only for a network that
+      is not. Do not set it redundantly — nothing downstream compares it against
+      `network`, so a mismatch is signed and then rejected at broadcast, after the
+      attempt is already recorded.
+    required: false
+  safe:
+    description: "Address of the Safe holding the funds."
+    required: false
+  token:
+    description: "ERC-20 being paid out."
+    required: false
+  allowance_module:
+    description: >
+      Safe AllowanceModule deployment address for this chain. Derived from
+      `network`; set it only to point at a different deployment.
+    required: false
+  delegate_key:
+    description: >
+      Private key of the delegate the spending limit was granted to. Pass from a
+      secret, never inline. It can only spend within the allowance and cannot
+      change the recipient of an existing one — but it CAN send the allowance
+      anywhere, so size the period cap to what you can afford to lose.
+    required: false
+  explorer_url:
+    description: >
+      Block explorer base, e.g. https://sepolia.etherscan.io. Used to link the
+      receipt. Derived from `network`; set it to use a different explorer.
+    required: false
+  pr:
+    description: "Pull request number whose comments hold the payout receipts."
+    required: false
+  github_token:
+    description: "Token used to read and write the receipt comment."
+    required: false
+
+outputs:
+  TX_HASH:
+    description: "Settlement transaction identifier, when one exists."
+  EXPLORER_URL:
+    description: "Human-readable link to the settlement."
+  STATUS:
+    description: "dry-run | settled | already-paid | skipped | error"
+  ERROR_CODE:
+    description: "Code from the XOps error taxonomy, empty on success."
+  IDEMPOTENCY_KEY:
+    description: "Canonical key this run derived. Identical inputs reproduce it."
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

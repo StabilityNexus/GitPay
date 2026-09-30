@@ -1,0 +1,36 @@
+{
+  "name": "xops",
+  "version": "0.1.0-dev",
+  "private": true,
+  "description": "CI/CD-native value transfer engine. A repository event produces a payment intent, a human signs it, the workflow settles it.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "xops": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "ncc build src/main.ts -o dist",
+    "typecheck": "tsc --noEmit",
+    "compile": "tsc",
+    "lint": "eslint .",
+    "test": "npm run compile && node scripts/run-tests.mjs",
+    "check:boundary": "node scripts/check-boundary.mjs",
+    "check:deps": "node scripts/check-deps.mjs",
+    "check": "npm run lint && npm run check:boundary && npm run check:deps && npm run test"
+  },
+  "dependencies": {
+    "@noble/curves": "1.9.2",
+    "@noble/hashes": "1.8.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.0",
+    "@types/node": "22.19.0",
+    "@vercel/ncc": "0.38.4",
+    "eslint": "9.39.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.2"
+  }
+}

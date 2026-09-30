@@ -1,2 +1,7 @@
+# I12 depends on dist/ being byte-identical across platforms.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+
 .github/workflows/*.yml linguist-detectable -linguist-vendored
 .github/workflows/*.yaml linguist-detectable -linguist-vendored

@@ -3,6 +3,18 @@
 Read this before writing code. Every session. This file is authoritative; if anything
 elsewhere contradicts it, this wins.
 
+> ## ⚠️ ARCHITECTURE PIVOT IN PROGRESS — read `DECISION-LOG.md` first
+>
+> As of **2026-09-05** the project has decided to move from the x402 / EIP-3009
+> signed-authorization model described below to the **Safe Allowance Module** model, because the
+> single optimization target is now **"maintainer does less"** and per-payout signing works
+> against it.
+>
+> **The x402, EIP-3009, `exact` scheme, facilitator and settlement-mode sections below are stale
+> and have not yet been rewritten.** The network rule has been updated; nothing else has.
+> `DECISION-LOG.md` §4 holds the decisions and supersedes this file on architecture until this
+> banner is removed.
+
 ---
 
 ## What this is
@@ -13,13 +25,23 @@ signs it, the workflow settles it, and a receipt is posted back.
 Built on **x402 v2** (Linux Foundation standard). First driver: the `exact` scheme over
 EIP-3009 `transferWithAuthorization`, USDC.
 
-**Base Sepolia is the only supported network until v1.0.0.** Monad, Base mainnet, Solana,
-Polygon and everything else are gated behind the release criteria in `REFERENCES.md` §2.4. Do
-not add a second network entry to `assets/chains.json`, do not write a second driver, and do
-not accept a PR that does. Base Sepolia has the free keyless facilitator
-(`x402.org/facilitator`) from the official quickstart and the most worked examples, so early
-failures are almost certainly your bug rather than the chain's — that is the entire reason to
-start here and stay here.
+**Ethereum Sepolia is the only supported network until v1.0.0.** Monad, Base (mainnet and
+Sepolia), Solana, Polygon and everything else are gated behind the release criteria in
+`REFERENCES.md` §2.4. Do not add a second network entry to `assets/chains.json`, do not write a
+second driver, and do not accept a PR that does.
+
+**Why Ethereum Sepolia, and why it changed from Base Sepolia:** the Safe **AllowanceModule** is
+canonically deployed on Ethereum Sepolia (`0xCFbFaC74C26F8647cBDb8c5caf80BB5b32E43134`, v0.1.0)
+and is **not deployed on Base Sepolia at all**. Under the allowance model the module is
+load-bearing, so Base Sepolia would mean self-deploying it — extra work, an unverified address,
+and a trust question for adopters. Everything needed on Ethereum Sepolia is free: testnet USDC
+from `faucet.circle.com`, Sepolia ETH from the Google Cloud / Alchemy / QuickNode faucets, and
+Safe{Wallet} supports the chain so the clickable Spending Limits flow works.
+
+The old justification for Base Sepolia was its free keyless x402 facilitator. Under the
+allowance model there is no facilitator, so that reason no longer applies.
+
+**The one-network rule itself is unchanged and still right** — only the network moved.
 
 ## The thesis
 
@@ -78,7 +100,7 @@ Only the driver owning that scheme may.
 | I6 | `verify()` is offline — zero network calls in `exact/eip155` |
 | I7 | Idempotency key is deterministic, versioned, and **excludes `amount`** |
 | I8 | `AUTH_ALREADY_USED` is **SUCCESS**, never failure |
-| I9 | A driver must declare `nativeReplayProtection`; Tier 0 refuses to settle without it |
+| I9 | A driver must declare `nativeReplayProtection`; **every tier** refuses to settle without it, or without a `SettlementLedger` standing in for it |
 | I10 | No amount above `policy.max_per_payout` reaches a driver |
 
 **Supply chain**
@@ -214,15 +236,32 @@ contract rejects it as used. That rejection is **success** (I8).
 - Amounts are **strings in atomic units**. Never `number`, never floats. USDC has 6 decimals.
 - `asset` is an **opaque identifier**, not an address — Solana mints and Stellar asset IDs
   are not `0x`. Resolve `decimals` from the registry, never infer.
-- Networks are **CAIP-2** (`eip155:143`), never friendly strings.
+- Networks are **CAIP-2** (`eip155:143`), never friendly strings. A workflow may *type* an
+  alias (`sepolia`); `canonicalNetwork()` resolves it before `parseIntent`, so the CAIP-2
+  spelling is the only one that reaches the intent, the idempotency key and the receipt.
+  Two spellings surviving into the key would let one payout settle twice.
+- Anything that is a **function of the network** — `chainId`, the AllowanceModule address,
+  the explorer base — comes from the chain registry in `src/drivers/chains.ts`, never from a
+  workflow input restating what `network` already says. An explicit input still overrides.
 - Errors are codes from `src/core/errors.ts`. Never surface a stack trace in a PR comment.
 - Every settlement path writes `TX_HASH` and `EXPLORER_URL` to `GITHUB_OUTPUT`, including on
   failure paths.
 - Timestamps: `validAfter = now - 60` (clock skew), `validBefore = now + 900` (15 min).
 - Multi-recipient is **N independent authorizations**, not one atomic batch. Each is
   independently idempotent and independently retryable.
-- Policy conditions are **named constants** (`PR_MERGED`, `TESTS_PASS`, `MAINTAINER_APPROVED`,
-  `COVERAGE_GT_80`). Never an expression language — that is a permanent security surface.
+- Policy conditions are **named constants**, never an expression language — that is a permanent
+  security surface, because whoever can edit an expression can rewrite the rule meant to
+  constrain them. Implemented in `src/core/policy.ts`: `SETTLEMENT_ENABLED` (kill switch,
+  evaluated first), `MAINTAINER_APPROVED`, `AMOUNT_WITHIN_CAP` (I10). Planned: `PR_MERGED`,
+  `TESTS_PASS`, `COVERAGE_GT_80`.
+- Policy is **declared, not scripted**. An adopter configures it with action inputs
+  (`enabled`, `allowed_associations`, `max_per_payout`) and never writes assertions in workflow
+  YAML. `evaluate()` is pure and total; every condition is evaluated so one run shows every
+  problem, and `assertAllowed()` reports the first failure's code.
+- What an `author_association` *means* belongs to the GitHub adapter. Core policy is told only
+  whether the actor may spend — and `undefined` there means "not comment-triggered", which
+  **skips** the condition rather than failing it. Treating a missing comment author as "not a
+  maintainer" would deny every workflow-configured payout.
 - `.xops.yml` carries `version: 1`. Unknown keys warn, never fail. Never repurpose a key.
 
 ---
@@ -248,8 +287,12 @@ contract rejects it as used. That rejection is **success** (I8).
 
 ## Scope
 
-**In:** `exact` scheme · **Base Sepolia only** · GitHub adapter · facilitator driver ·
-inline-address resolver · CLI · static signer page · machine-readable receipts.
+**In:** **Ethereum Sepolia only** · GitHub adapter · Safe AllowanceModule driver ·
+inline-address resolver · CLI · machine-readable receipts.
+
+> Was: "`exact` scheme · Base Sepolia only · facilitator driver · static signer page". The
+> scheme, facilitator driver and signer page all belonged to the x402 / EIP-3009 design and are
+> superseded by the allowance model. See the banner at the top of this file.
 
 **Specify, do not build:** any second network (Base mainnet, Monad, Solana, Polygon) ·
 `auth-capture` (escrow) · `upto` · `batch-settlement` · non-EVM drivers · ERC-8004 resolver ·
@@ -278,11 +321,12 @@ Take the interface, never the bet. Agents may propose; humans sign.
 
 ## When stuck
 
-- `ROADMAP.md` — what to build this week, and the test that proves it
+- `ROADMAP-FUTURE.md` — the sanctioned backlog beyond `v1.0.0`. What remains *before* it is the
+  unticked half of the release gate, `REFERENCES.md` §2.4
 - `REFERENCES.md` — verified constants, type definitions, tested primitives, error codes
 - Spec: `github.com/x402-foundation/x402` → `specs/x402-specification-v2.md`,
   `specs/schemes/exact/scheme_exact_evm.md`
-- Base Sepolia constants and the release gate: `REFERENCES.md` §2
+- Ethereum Sepolia constants and the release gate: `REFERENCES.md` §2
 
 Prefer deleting code over adding an abstraction. The dependency count and the layer boundary
 are the product.

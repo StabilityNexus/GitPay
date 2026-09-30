@@ -28,36 +28,48 @@ Node ≥ 20 (native `fetch`, `using: node20` in `action.yml`).
 
 ---
 
-## 2. Chain registry — `assets/chains.json`
+## 2. Chain registry — `src/drivers/chains.ts`
 
-**Base Sepolia is the only network implemented until v1.0.0.** Everything in §2.3 is reference
-material for later phases — do not add those entries to `chains.json` yet.
+> Implemented as a TypeScript module, not `assets/chains.json`: it is one entry, and a JSON
+> import would need a bundler assertion for nothing. It lives under `src/drivers/` because
+> that is the only place I1 permits a chain id or a hex address to be written down. `main.ts`
+> does the lookup and hands plain strings down, so core and the adapters still learn nothing.
 
-### 2.1 Base Sepolia — the only active target
+**Ethereum Sepolia is the only network implemented until v1.0.0.** Everything in §2.3 is
+reference material for later phases — do not add those entries to `chains.json` yet.
+
+### 2.1 Ethereum Sepolia — the only active target
+
+Changed from Base Sepolia on 2026-09-05. Reason: the Safe **AllowanceModule** is canonically
+deployed on Ethereum Sepolia and **absent from Base Sepolia entirely**. Under the allowance
+model the module is load-bearing. See `DECISION-LOG.md` §4 and §6c.
 
 ```jsonc
 {
-  "eip155:84532": {
-    "name": "Base Sepolia",
-    "chainId": 84532,
-    "explorer": "https://sepolia.basescan.org",
-    "facilitator": "https://x402.org/facilitator",
+  "eip155:11155111": {
+    "name": "Ethereum Sepolia",
+    "chainId": 11155111,
+    "explorer": "https://sepolia.etherscan.io",
+    "allowanceModule": "0xCFbFaC74C26F8647cBDb8c5caf80BB5b32E43134", // v0.1.0, verified
     "assets": {
       "USDC": {
-        "address": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-        "decimals": 6,
-        "eip712": { "name": "USDC", "version": "2" }
+        "address": "TODO — verify against Circle's docs before use",
+        "decimals": 6
       }
     }
   }
 }
 ```
 
-> ⚠️ **Verify before the first signature.** These values come from ecosystem sources and were
-> **not** independently confirmed in the session that produced this file. Call `name()` and
-> `version()` on the deployed contract and check the address against Circle's documentation. A
-> wrong EIP-712 domain produces a structurally valid signature that fails on-chain with no
-> useful error — the single most likely thing to cost you a day.
+> ⚠️ **The USDC address is deliberately unfilled.** Get it from `faucet.circle.com` /
+> Circle's contract documentation for Ethereum Sepolia and confirm `decimals()` on-chain.
+> It was not verified in the session that produced this entry, and a guessed token address is
+> worse than an empty one.
+
+> **The `facilitator` and `eip712` fields are gone on purpose.** Both belonged to the x402 /
+> EIP-3009 `transferWithAuthorization` design. Under the allowance model there is no facilitator
+> and no typed-data signature to build, so there is no EIP-712 domain to get wrong. The
+> AllowanceModule address replaces them as the load-bearing constant.
 
 **Why this chain:** `x402.org/facilitator` is free, keyless, and the URL used in the official
 quickstart. Testnet USDC comes from `faucet.circle.com`; gas from the Alchemy, GetBlock, or CDP
@@ -122,31 +134,53 @@ Premier member of the x402 Foundation.
 
 Every box, no exceptions. Multi-network work does not start until this is a tagged `v1.0.0`.
 
+> **Rewritten 2026-09-14** against the Safe AllowanceModule architecture (`DECISION-LOG.md` §4).
+> The previous version was written for the x402 / EIP-3009 model and listed boxes that the
+> current design can never tick — EIP-712 digest vectors, `AUTH_EXPIRED` expiry tests, and a
+> payout with zero private keys in GitHub Secrets. The allowance model puts a delegate key in CI
+> **on purpose**; the bound on that key is the Safe's period cap, not its absence. A gate that
+> cannot close is not a gate.
+>
+> A tick here means a linked CI run or a linked PR comment, not a recollection.
+
 **Correctness**
-- [ ] Golden vectors pass — domain, digest, signature, recovered address, full calldata
-- [ ] `verify()` passes with the network disabled (I6)
-- [ ] Property test: identical key inputs → identical canonical string (I7)
-- [ ] Mock driver settles end-to-end with zero core changes (§2.2)
+- [ ] Golden vectors pass — encoded calldata, signed raw transaction, transaction hash
+- [ ] `verify()` rejects a mismatched network, recipient and amount, offline (I6)
+- [x] Property test: identical key inputs → identical canonical string (I7)
+- [x] Mock driver settles end-to-end with zero core changes (§2.2)
 
 **Safety**
-- [ ] Settle on testnet, re-run the identical workflow, get **success** + `AUTH_ALREADY_USED` (I8)
-- [ ] Custodial mock driver throws at tier-0 registration (I3)
-- [ ] Driver with `nativeReplayProtection: false` refuses to settle (I9)
-- [ ] `max_per_payout` blocks before any driver is reached (I10)
-- [ ] Kill switch (`settlement.enabled: false`) halts before policy runs
+- [ ] Settle on testnet, re-run the identical workflow, get **success** + `AUTH_ALREADY_USED`
+      from the receipt ledger (I8)
+- [x] Custodial mock driver throws at tier-0 registration (I3)
+- [x] A driver declaring `nativeReplayProtection: false` refuses to settle without a ledger (I9)
+- [x] `max_per_payout` blocks before any driver is reached (I10)
+- [x] Kill switch (`enabled: false`) refuses regardless of the rest of the configuration
+- [x] The ledger entry is written **before** broadcast, and a failure to write it refuses the
+      payout rather than settling unrecorded
+- [ ] A second in-flight delegate transaction is refused, not queued behind the first
 
 **Supply chain**
-- [ ] `npm ls --omit=dev --all` ≤ 2 packages (I11)
-- [ ] `dist/` rebuild is byte-identical to committed (I12)
-- [ ] Layer-boundary grep is clean (I1)
+- [x] `npm ls --omit=dev --all` ≤ 2 packages (I11)
+- [x] `dist/` rebuild is byte-identical to committed (I12)
+- [x] Layer-boundary grep is clean (I1)
 - [ ] SBOM and build provenance published
 
 **Operational**
-- [ ] A real payout settles from an actual PR merge, end to end
-- [ ] 20+ consecutive testnet settlements including deliberate replays and expiries
-- [ ] A fresh repo integrates in under 5 minutes with zero secrets in dry-run
+- [ ] A real payout settles from an actual merged PR, end to end
+- [ ] 20+ consecutive testnet settlements, including deliberate replays of an already-paid key
+- [ ] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
 - [ ] Config schema frozen and published as JSON Schema
 - [ ] `v1.0.0` tagged
+
+**Custody, stated honestly.** This gate does not claim the operator holds no key. It claims the
+key's authority is bounded on-chain and revocable: the delegate can move at most one period's
+allowance, to any address it chooses, until a Safe owner removes it. Size the period cap at what
+you can afford to lose in one period. `DECISION-LOG.md` §6a has the full blast-radius reading.
+
+**Never cut**, whatever else slips: golden vectors · offline verify · the replay test · the I1
+lint · the dry-run default · the tier gate · this gate itself. Those are what make the claim
+"provably correct" rather than "probably fine", and the claim is the deliverable.
 
 **The point of the gate:** every unchecked box is a bug you would otherwise discover on a second
 chain, where you cannot tell whether it is your bug or the chain's. Fix them where the ground is
@@ -156,11 +190,42 @@ firm.
 
 | | Source |
 |---|---|
-| Base Sepolia USDC | `faucet.circle.com` — select Base Sepolia + USDC |
-| Base Sepolia ETH | Alchemy, GetBlock, or Coinbase CDP faucets |
+| Ethereum Sepolia USDC | `faucet.circle.com` — select Ethereum Sepolia + USDC |
+| Ethereum Sepolia ETH | Google Cloud Web3 faucet, Alchemy, or QuickNode |
 
 Public facilitators are free today with no published SLA. Design for one disappearing — that is
 what `mode: self` and `mode: auto` exist for.
+
+### 2.6 Per-chain verification protocol
+
+Run this for **every** new network, once the gate in §2.4 is green. It is the reusable artifact
+that makes a fourth chain cost the same as the second. Salvaged from the deleted six-week
+`ROADMAP.md` §6.1 and rewritten for the allowance architecture — the EIP-712 domain checks it
+used to open with no longer apply, because nothing signs a payment authorization any more.
+
+1. **Verify the module deployment first.** The Safe `AllowanceModule` is **not** deployed
+   everywhere — it is absent from Base Sepolia entirely, which is why Ethereum Sepolia is the
+   only active target (`DECISION-LOG.md` §6c). Check `safe-modules-deployments` for the chain,
+   and confirm the address holds code on-chain. Never copy a sibling network's entry.
+2. **Verify the token.** Call `decimals()` on the payout token and check the address against the
+   issuer's own documentation. A wrong `decimals` is a silent factor-of-1000 error in the amount.
+3. **Add a `chains.ts` entry. Nothing else.** If you need to touch any other file, stop and fix
+   the boundary instead. That is the finding, and it is worth more than the chain.
+4. **Confirm the diff.** `git diff --stat` must show no changes under `src/core` or
+   `src/adapters`.
+5. **Dry-run and read the calldata.** Selector `0x4515641a`, **292 bytes** with an empty
+   signature (4 + eight head words + a zero-length `bytes` tail), with the Safe, token, recipient
+   and amount correct in the decoded words.
+6. **Settle the smallest possible amount.**
+7. **Replay test** — re-run the identical inputs, expect success + `AUTH_ALREADY_USED` and the
+   original transaction link, served from the PR receipt ledger.
+8. **Wrong-network negative test** → `DOMAIN_MISMATCH`, using a neighbouring chain's CAIP-2
+   identifier against the same driver.
+9. **Commit a golden vector for this chain** — calldata, signed raw transaction, transaction hash.
+10. **Record the tx hash** in `docs/VERIFIED_CHAINS.md`.
+
+Mainnet only: start below $1, and confirm the Safe's balance moved by exactly the expected amount
+before doing anything larger.
 
 ## 3. Core types
 
@@ -383,6 +448,7 @@ Core never reads inside `payload`. Only `drivers/exact-eip155` does.
 | `INSUFFICIENT_GAS` | Gas wallet empty | Fund `0x…` with native token | user |
 | `SIMULATION_REVERT` | `eth_call` reverted | Decoded revert reason | no |
 | `RPC_UNAVAILABLE` | All endpoints failed | Retryable; set `rpc_url` to override | auto |
+| `NONCE_CONFLICT` | Another tx used this payout's nonce | Not sent; check the account, retry with a new `round` | user |
 | `DRIVER_NOT_FOUND` | No driver for pair | Unsupported network/scheme | no |
 | `TIER_VIOLATION` | Driver needs secrets or custody in Tier 0 | Run your own facilitator | no |
 | `NO_REPLAY_PROTECTION` | Driver lacks exactly-once guarantee | Cannot settle in Tier 0 | no |

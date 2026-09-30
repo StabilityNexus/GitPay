@@ -324,3 +324,21 @@ TSWLatexianTemp*
 # option is specified. Footnotes are the stored in a file with suffix Notes.bib.
 # Uncomment the next line to have this generated file ignored.
 #*Notes.bib
+
+node_modules/
+build/
+*.log
+.DS_Store
+
+# Local scratch and personal docs — not part of the project
+.playwright-mcp/
+karungsocprop.pdf
+*.pdf
+
+# A separate repository with its own remote, cloned here for convenience.
+# Without this, `git add -A` in the parent swallows it as a gitlink or as files.
+demo-XOps/
+
+# Windows' null device is not a path in Git Bash, so `> nul` or
+# `GITHUB_OUTPUT=nul` silently creates a real file full of test output.
+nul
