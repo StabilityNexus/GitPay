@@ -1,0 +1,21 @@
+version: 2
+
+# Skip these when ingesting manifests for scans
+projectIgnorePaths:
+  - "build"
+  - "dist"
+
+# Only rescan PRs when dependency manifests actually change
+triggerPaths:
+  - "package.json"
+  - "package-lock.json"
+
+githubApp:
+  enabled: true
+  pullRequestAlertsEnabled: true
+  dependencyOverviewEnabled: true
+  projectReportsEnabled: true
+  ignoreUsers:
+    - "dependabot[bot]"
+    - "github-actions[bot]"
+  disableCommentsAndCheckRuns: false

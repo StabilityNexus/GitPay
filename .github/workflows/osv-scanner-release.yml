@@ -1,0 +1,46 @@
+# https://google.github.io/osv-scanner/github-action/#scan-on-release
+name: Release Process
+
+on:
+  push:
+    tags:
+      - "*" # triggers only if push new tag version, like `0.8.4` or else
+
+permissions:
+  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
+  actions: read
+  # Require writing security events to upload SARIF file to security tab
+  security-events: write
+  # to fetch code (actions/checkout)
+  contents: read
+
+jobs:
+  osv-scan:
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.6.0"
+    with:
+      # Recursive scan supports multiple ecosystems:
+      # Go, Node.js, Python, Rust, Java, etc.
+      scan-args: |-
+        ./
+    permissions:
+      # Require writing security events to upload SARIF file to security tab
+      security-events: write
+  tests:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder test step
+        run: echo "Wire this up to 'npm test' once source and package.json land in this repo"
+    # TODO: replace with `npm ci && npm test` once the project source is merged into this repo
+  release:
+    needs: # Needs both tests and osv-scan to pass
+      - tests
+      - osv-scan
+    runs-on: ubuntu-latest
+    # Your actual release steps
+    steps:
+       - name: Placeholder release step
+         run: echo "Configure release steps here (ncc build, tag, GitHub Release) once release strategy is decided"
+    # Add actual release/build/publish steps here, e.g.:
+    # - npm ci && npm run build
+    # - Create GitHub Release with the built dist/
