@@ -11,6 +11,10 @@ LICENSE
 # GitHub workflows are not synced by default due to GitHub policy
 .github/workflows/**
 
+# GoReleaser builds Go binaries; GitPay is a Node Action released by
+# .github/workflows/release.yml, so the template's config is not wanted here.
+.goreleaser.yaml
+
 # Add more patterns to exclude specific files or directories
 # Examples:
 # docs/
