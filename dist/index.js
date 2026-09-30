@@ -271,14 +271,15 @@ function findReceipt(comments, key) {
         if (!isTrustedReceiptAuthor(comment))
             continue;
         const transaction = marker["tx"] ?? LEGACY_TRANSACTION.exec(body)?.[1];
+        // The prose is read only for legacy receipts whose marker carries no
+        // status. An explicit status always wins, since the prose can say anything.
+        const status = marker["status"] ?? (body.includes("payout settled") ? "settled" : undefined);
         const receipt = {
             key,
             // An unconfirmed record still blocks a re-pay. Reading it as anything
             // weaker would reintroduce the double-payment window it exists to close.
             // Anything that is not explicitly settled is treated as in-flight.
-            status: marker["status"] === "settled" || body.includes("payout settled")
-                ? "settled"
-                : "broadcasting",
+            status: status === "settled" ? "settled" : "broadcasting",
             ...(transaction === undefined ? {} : { transaction }),
         };
         if (receipt.status === "settled")
@@ -445,6 +446,11 @@ function encodeExecuteAllowanceTransfer(call) {
 }
 
 ;// CONCATENATED MODULE: ./src/drivers/safe-allowance/rpc.ts
+/**
+ * Per request. `fetch` has no timeout of its own, so a stalled endpoint would
+ * otherwise hold the job until CI kills it.
+ */
+const RPC_TIMEOUT_MS = 30_000;
 /** Minimal JSON-RPC over fetch. No dependency, because one call shape is all this needs. */
 class JsonRpc {
     url;
@@ -456,6 +462,7 @@ class JsonRpc {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+            signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
         });
         if (!response.ok) {
             throw new Error(`RPC ${method} failed: HTTP ${response.status}`);
@@ -4739,11 +4746,17 @@ class SafeAllowanceDriver {
         await this.rpc.call("eth_call", [call, "latest"]).catch((err) => {
             throw Object.assign(new Error(`simulation reverted: ${err instanceof Error ? err.message : String(err)}`), { code: "SIMULATION_REVERT" });
         });
+        // No guessed fallback. The simulation just passed, so a failed estimate is
+        // an RPC problem, and a guessed limit that is too low reverts on-chain,
+        // burns gas, and leaves a recorded attempt that needs a `round` bump.
+        // Nothing is recorded yet, so aborting here costs nothing.
         const gasLimit = this.config.gasLimit ??
             (await this.rpc
                 .hex("eth_estimateGas", [call])
                 .then((hex) => (fromHex(hex) * 12n) / 10n)
-                .catch(() => 200000n));
+                .catch((err) => {
+                throw Object.assign(new Error(`gas estimation failed: ${err instanceof Error ? err.message : String(err)}`), { code: "RPC_UNAVAILABLE" });
+            }));
         const signed = signTransaction({
             chainId: this.config.chainId,
             nonce: pending,
@@ -4760,14 +4773,18 @@ class SafeAllowanceDriver {
     /** The irreversible step. Everything before this can be abandoned safely. */
     async broadcast(prepared) {
         const { raw } = prepared.raw;
+        let nonceTooLow = false;
         try {
             await this.rpc.hex("eth_sendRawTransaction", [raw]);
         }
         catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             // Already known to the network is not a failure — it is this exact
-            // transaction, which is precisely what we wanted broadcast.
-            if (!/already known|known transaction|nonce too low/i.test(message)) {
+            // transaction, which is precisely what we wanted broadcast. A nonce that
+            // is too low may also be this transaction, already mined, so it is
+            // polled by its exact hash like the others.
+            nonceTooLow = /nonce too low/i.test(message);
+            if (!nonceTooLow && !/already known|known transaction/i.test(message)) {
                 return {
                     success: false,
                     network: this.config.network,
@@ -4775,11 +4792,18 @@ class SafeAllowanceDriver {
                 };
             }
         }
-        return this.awaitReceipt(prepared.reference);
+        // With no receipt for this hash, a nonce that was too low means a different
+        // transaction used it, so this one can never land. That is a definite
+        // answer, unlike an ordinary timeout.
+        return this.awaitReceipt(prepared.reference, nonceTooLow ? "NONCE_CONFLICT" : "RPC_UNAVAILABLE");
     }
-    async awaitReceipt(hash) {
+    async awaitReceipt(hash, unconfirmed) {
         for (let attempt = 0; attempt < 30; attempt += 1) {
-            const receipt = await this.rpc.call("eth_getTransactionReceipt", [hash]);
+            // One failed poll is not an outcome. The transaction may already be out,
+            // so keep polling rather than drop the hash on a transient error.
+            const receipt = await this.rpc
+                .call("eth_getTransactionReceipt", [hash])
+                .catch(() => null);
             if (receipt) {
                 return receipt.status === "0x1"
                     ? { success: true, transaction: hash, network: this.config.network }
@@ -4799,7 +4823,7 @@ class SafeAllowanceDriver {
             success: false,
             transaction: hash,
             network: this.config.network,
-            errorReason: "RPC_UNAVAILABLE",
+            errorReason: unconfirmed,
         };
     }
 }
@@ -4974,6 +4998,7 @@ const ERROR_CODES = (/* unused pure expression or super */ null && ([
     "INSUFFICIENT_GAS",
     "SIMULATION_REVERT",
     "RPC_UNAVAILABLE",
+    "NONCE_CONFLICT",
     "DRIVER_NOT_FOUND",
     "TIER_VIOLATION",
     "NO_REPLAY_PROTECTION",
@@ -5063,6 +5088,13 @@ const ERRORS = {
         retry: "auto",
         success: false,
     },
+    NONCE_CONFLICT: {
+        meaning: "A different transaction from the broadcasting account used this nonce",
+        comment: "Another transaction took this payout's nonce, so the payout was not sent. " +
+            "Check the broadcasting account's history, then retry with a new `round`.",
+        retry: "user",
+        success: false,
+    },
     DRIVER_NOT_FOUND: {
         meaning: "No driver registered for this network and scheme",
         comment: "Unsupported network/scheme combination.",
@@ -5108,10 +5140,28 @@ function isSuccessCode(code) {
  * `amount` is excluded on purpose: with amount in the key, `/send alice 50`
  * corrected to `/send alice 500` yields two keys and Alice receives 550.
  * Excluded, the correction collides and requires an explicit `round` bump.
+ *
+ * The string must be injective, so a field may not contain the delimiter that
+ * ends it. Otherwise `ref = "R|A|N"` beside `asset = "X"` spells the same key
+ * as `ref = "R"` beside `asset = "B|N|X"`, and one payout's receipt would
+ * silently block another. Whitespace is refused too: the receipt marker is
+ * whitespace-separated, so a key containing a space could never find its own
+ * receipt, and the payout could be made twice.
  */
 function canonical(k) {
-    return (`xops:v${k.v}|${k.source.platform}:${k.source.repo}#${k.source.ref}` +
-        `|${k.recipient.toLowerCase()}|${k.network}|${k.asset}|${k.round}`);
+    const repo = field("repo", k.source.repo, /[|#\s]/);
+    const ref = field("ref", k.source.ref);
+    const recipient = field("recipient", k.recipient).toLowerCase();
+    const network = field("network", k.network);
+    const asset = field("asset", k.asset);
+    return (`xops:v${k.v}|${k.source.platform}:${repo}#${ref}` +
+        `|${recipient}|${network}|${asset}|${k.round}`);
+}
+function field(name, value, forbidden = /[|\s]/) {
+    if (forbidden.test(value)) {
+        throw new Error(`Idempotency key field ${name} contains a delimiter or whitespace, got "${value}"`);
+    }
+    return value;
 }
 function keyFor(intent) {
     const { source } = intent;
@@ -5167,6 +5217,51 @@ function parseIntent(raw) {
         : { platform, project: repo, ref, actor };
     return { source, recipient, amount, asset, network, scheme, round };
 }
+
+;// CONCATENATED MODULE: ./src/core/ledger.ts
+/**
+ * Exactly-once has to come from somewhere.
+ *
+ * Some rails give it natively: EIP-3009 consumes a nonce, so a replayed
+ * authorization reverts and a retry is a no-op. Safe's AllowanceModule does not
+ * — on the `msg.sender == delegate` path it checks caller identity only and
+ * never compares the nonce against a stored value, so an identical second call
+ * transfers again while the allowance has headroom.
+ *
+ * For a rail like that, a ledger supplies what the chain will not: a durable
+ * record, keyed by the canonical idempotency key, that a later run can find.
+ *
+ * Core defines only the shape. It never learns where the record is kept.
+ */
+/**
+ * A ledger for one payout that also finds entries recorded under older
+ * spellings of its key. It writes under the canonical key only, so the aliases
+ * are only a migration step. A payout recorded under a spelling the lookup
+ * cannot see would be paid again, because nothing on this rail refuses a second
+ * transfer.
+ */
+function withAliases(ledger, aliases) {
+    return {
+        id: ledger.id,
+        async lookup(key) {
+            for (const candidate of [key, ...aliases.filter((alias) => alias !== key)]) {
+                const entry = await ledger.lookup(candidate);
+                if (entry)
+                    return entry;
+            }
+            return undefined;
+        },
+        record: (key, entry) => ledger.record(key, entry),
+        confirm: (key, entry) => ledger.confirm(key, entry),
+    };
+}
+/**
+ * A ledger lookup narrows a race, it does not close one. Two runs can both look
+ * up, both miss, and both settle. Anything driving a non-idempotent rail needs
+ * mutual exclusion around the whole check-settle-record sequence — for GitHub
+ * Actions that is a `concurrency:` group keyed on the payout.
+ */
+const LEDGER_RACE_WARNING = "A ledger lookup is check-then-act. Serialize payouts with a concurrency group.";
 
 ;// CONCATENATED MODULE: ./src/core/policy.ts
 
@@ -5506,6 +5601,7 @@ class ResolverChain {
 
 
 
+
 async function run() {
     // L0 TRIGGER. A comment body, when given, is the source of truth for who gets
     // paid and how much — it beats the workflow's static inputs, because a person
@@ -5576,9 +5672,22 @@ async function run() {
     console.log("policy:");
     console.log(format(decision));
     assertAllowed(decision);
-    const idempotencyKey = canonical(keyFor(intent));
     const resolvers = new ResolverChain([new InlineAddressResolver()]);
     const target = await resolvers.resolve(intent.recipient, { rail: intent.network });
+    /**
+     * The key names the resolved address, not the identity as typed.
+     * `inline:0xabc` and `0xabc` are one payee. Keyed on the typed spelling, a
+     * payout sent one way and retried the other way would find no receipt, and
+     * this rail would transfer again.
+     *
+     * Receipts written before this change carry the `inline:` spelling. They are
+     * still looked up, but new ones are recorded only under the canonical key.
+     */
+    const key = keyFor(intent);
+    const idempotencyKey = canonical({ ...key, recipient: target.address });
+    const legacyKeys = target.resolvedBy === "inline-address"
+        ? [canonical({ ...key, recipient: `${INLINE_PREFIX}${target.address}` })]
+        : [];
     console.log("intent:");
     console.log(JSON.stringify(intent, null, 2));
     console.log("payout target:");
@@ -5638,7 +5747,8 @@ async function run() {
      */
     const registry = new DriverRegistry(1);
     registry.register(driver);
-    const ledger = new PullRequestReceiptLedger({
+    const explorerUrl = readInput("explorer_url") ?? chain?.explorer;
+    const receipts = new PullRequestReceiptLedger({
         repo: intent.source.platform === "github" ? intent.source.repo : intent.source.project,
         number: Number(required("pr")),
         token: required("github_token"),
@@ -5652,9 +5762,10 @@ async function run() {
             from: readInput("safe"),
             actor: intent.source.actor,
             network: intent.network,
-            explorerUrl: readInput("explorer_url") ?? chain?.explorer,
+            explorerUrl,
         },
     });
+    const ledger = withAliases(receipts, legacyKeys);
     const requirements = registry.buildRequirements({ intent, target, idempotencyKey });
     const verified = await driver.verify({ x402Version: 2, scheme: intent.scheme, network: intent.network, payload: {} }, requirements);
     if (!verified.isValid) {
@@ -5668,6 +5779,9 @@ async function run() {
     writeOutputs({
         STATUS: response.success ? (alreadyPaid ? "already-paid" : "settled") : "error",
         TX_HASH: response.transaction ?? "",
+        EXPLORER_URL: explorerUrl && response.transaction
+            ? `${explorerUrl.replace(/\/+$/, "")}/tx/${response.transaction}`
+            : "",
         IDEMPOTENCY_KEY: idempotencyKey,
         ERROR_CODE: response.success ? "" : (response.errorReason ?? ""),
     });
@@ -5679,7 +5793,7 @@ run().then((code) => {
     const code = err instanceof XOpsError ? err.code : "";
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
-    writeOutputs({ STATUS: "error", ERROR_CODE: code });
+    writeOutputs({ STATUS: "error", TX_HASH: "", EXPLORER_URL: "", ERROR_CODE: code });
     process.exitCode = 1;
 });
 

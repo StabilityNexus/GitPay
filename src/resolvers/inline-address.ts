@@ -1,7 +1,7 @@
 import type { PayoutTarget } from "../core/types.js";
 import type { Resolver, ResolveContext } from "./types.js";
 
-const INLINE_PREFIX = "inline:";
+export const INLINE_PREFIX = "inline:";
 
 /**
  * Takes the payout address verbatim from the identity string. It does not

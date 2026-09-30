@@ -83,6 +83,32 @@ test("asset and network are in the key, so multi-asset payouts need no core chan
   assert.notEqual(base, canonical(keyFor(intent({ network: "mock:ledger" }))));
 });
 
+test("a delimiter inside a field is refused, so two keys can never spell the same string", () => {
+  const a = "0x1111111111111111111111111111111111111111";
+  const b = "0x2222222222222222222222222222222222222222";
+  const n = "eip155:11155111";
+  const pipeInAsset = { ref: "pull/1", recipient: a, asset: `${b}|${n}|USDC` };
+  const pipeInRef = { ref: `pull/1|${a}|${n}`, recipient: b, asset: "USDC" };
+
+  for (const { ref, recipient, asset } of [pipeInAsset, pipeInRef]) {
+    const key = keyFor(
+      intent({ source: { platform: "github", repo: "o/r", ref, actor: "m" }, recipient, asset }),
+    );
+    assert.throws(() => canonical(key), /delimiter/);
+  }
+});
+
+test("whitespace and a '#' in the repo are refused too", () => {
+  assert.throws(() => canonical(keyFor(intent({ asset: "US DC" }))), /asset/);
+  assert.throws(
+    () =>
+      canonical(
+        keyFor(intent({ source: { platform: "github", repo: "o/r#x", ref: "p", actor: "m" } })),
+      ),
+    /repo/,
+  );
+});
+
 test("the key is versioned and returns a plain string", () => {
   const key = canonical(keyFor(intent()));
   assert.equal(typeof key, "string");

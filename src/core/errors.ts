@@ -13,6 +13,7 @@ export const ERROR_CODES = [
   "INSUFFICIENT_GAS",
   "SIMULATION_REVERT",
   "RPC_UNAVAILABLE",
+  "NONCE_CONFLICT",
   "DRIVER_NOT_FOUND",
   "TIER_VIOLATION",
   "NO_REPLAY_PROTECTION",
@@ -114,6 +115,14 @@ export const ERRORS: Record<ErrorCode, ErrorSpec> = {
     meaning: "Every configured endpoint failed",
     comment: "No endpoint responded. Retryable; set `rpc_url` to override.",
     retry: "auto",
+    success: false,
+  },
+  NONCE_CONFLICT: {
+    meaning: "A different transaction from the broadcasting account used this nonce",
+    comment:
+      "Another transaction took this payout's nonce, so the payout was not sent. " +
+      "Check the broadcasting account's history, then retry with a new `round`.",
+    retry: "user",
     success: false,
   },
   DRIVER_NOT_FOUND: {

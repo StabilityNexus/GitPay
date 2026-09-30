@@ -84,6 +84,29 @@ test("the boundary grep catches primitives no import rule would see", () => {
   }
 });
 
+test("the boundary grep catches dynamic imports, which the lint rule does not inspect", () => {
+  const dir = mkdtempSync(join(tmpdir(), "xops-i1-"));
+  try {
+    mkdirSync(join(dir, "core"), { recursive: true });
+    writeFileSync(
+      join(dir, "core", "lazy.ts"),
+      [
+        'export const hashes = () => import("@noble/hashes/sha3.js");',
+        "export const drivers = () => import ( '../drivers/registry.js' );",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const run = spawnSync(process.execPath, [BOUNDARY, dir], { encoding: "utf8" });
+
+    assert.equal(run.status, 1, run.stdout + run.stderr);
+    assert.match(run.stderr, /chain-library-import/);
+    assert.match(run.stderr, /driver-or-asset-import/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the boundary grep is clean on the real tree", () => {
   const out = execFileSync(process.execPath, [BOUNDARY], { encoding: "utf8" });
   assert.match(out, /I1 clean/);

@@ -73,6 +73,28 @@ export interface SettlementLedger {
 }
 
 /**
+ * A ledger for one payout that also finds entries recorded under older
+ * spellings of its key. It writes under the canonical key only, so the aliases
+ * are only a migration step. A payout recorded under a spelling the lookup
+ * cannot see would be paid again, because nothing on this rail refuses a second
+ * transfer.
+ */
+export function withAliases(ledger: SettlementLedger, aliases: readonly string[]): SettlementLedger {
+  return {
+    id: ledger.id,
+    async lookup(key) {
+      for (const candidate of [key, ...aliases.filter((alias) => alias !== key)]) {
+        const entry = await ledger.lookup(candidate);
+        if (entry) return entry;
+      }
+      return undefined;
+    },
+    record: (key, entry) => ledger.record(key, entry),
+    confirm: (key, entry) => ledger.confirm(key, entry),
+  };
+}
+
+/**
  * A ledger lookup narrows a race, it does not close one. Two runs can both look
  * up, both miss, and both settle. Anything driving a non-idempotent rail needs
  * mutual exclusion around the whole check-settle-record sequence — for GitHub

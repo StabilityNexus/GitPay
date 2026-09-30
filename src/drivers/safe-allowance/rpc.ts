@@ -1,3 +1,9 @@
+/**
+ * Per request. `fetch` has no timeout of its own, so a stalled endpoint would
+ * otherwise hold the job until CI kills it.
+ */
+const RPC_TIMEOUT_MS = 30_000;
+
 /** Minimal JSON-RPC over fetch. No dependency, because one call shape is all this needs. */
 export class JsonRpc {
   constructor(private readonly url: string) {}
@@ -7,6 +13,7 @@ export class JsonRpc {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
     });
 
     if (!response.ok) {

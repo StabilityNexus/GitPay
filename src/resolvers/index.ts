@@ -3,7 +3,7 @@ import type { PayoutTarget } from "../core/types.js";
 import type { Resolver, ResolveContext } from "./types.js";
 
 export type { Resolver, ResolveContext } from "./types.js";
-export { InlineAddressResolver } from "./inline-address.js";
+export { INLINE_PREFIX, InlineAddressResolver } from "./inline-address.js";
 
 export class ResolverChain {
   private readonly resolvers: Resolver[];

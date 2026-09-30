@@ -16,7 +16,7 @@ inputs:
   actor_association:
     description: >
       GitHub's author_association for the comment author. `/send` is denied unless
-      this is OWNER, MEMBER or COLLABORATOR. Required whenever `comment` is used.
+      it is one of `allowed_associations`. Required whenever `comment` is used.
     required: false
   decimals:
     description: "Decimals for the asset, used to convert a `/send` amount to atomic units."

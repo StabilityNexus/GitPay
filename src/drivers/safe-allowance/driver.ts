@@ -165,12 +165,23 @@ export class SafeAllowanceDriver implements SettlementDriver {
       );
     });
 
+    // No guessed fallback. The simulation just passed, so a failed estimate is
+    // an RPC problem, and a guessed limit that is too low reverts on-chain,
+    // burns gas, and leaves a recorded attempt that needs a `round` bump.
+    // Nothing is recorded yet, so aborting here costs nothing.
     const gasLimit =
       this.config.gasLimit ??
       (await this.rpc
         .hex("eth_estimateGas", [call])
         .then((hex) => (fromHex(hex) * 12n) / 10n)
-        .catch(() => 200_000n));
+        .catch((err: unknown) => {
+          throw Object.assign(
+            new Error(
+              `gas estimation failed: ${err instanceof Error ? err.message : String(err)}`,
+            ),
+            { code: "RPC_UNAVAILABLE" satisfies ErrorCode },
+          );
+        }));
 
     const signed = signTransaction(
       {
@@ -193,14 +204,18 @@ export class SafeAllowanceDriver implements SettlementDriver {
   /** The irreversible step. Everything before this can be abandoned safely. */
   async broadcast(prepared: PreparedSettlement): Promise<SettlementResponse> {
     const { raw } = prepared.raw as PreparedRaw;
+    let nonceTooLow = false;
 
     try {
       await this.rpc.hex("eth_sendRawTransaction", [raw]);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // Already known to the network is not a failure — it is this exact
-      // transaction, which is precisely what we wanted broadcast.
-      if (!/already known|known transaction|nonce too low/i.test(message)) {
+      // transaction, which is precisely what we wanted broadcast. A nonce that
+      // is too low may also be this transaction, already mined, so it is
+      // polled by its exact hash like the others.
+      nonceTooLow = /nonce too low/i.test(message);
+      if (!nonceTooLow && !/already known|known transaction/i.test(message)) {
         return {
           success: false,
           network: this.config.network,
@@ -209,15 +224,19 @@ export class SafeAllowanceDriver implements SettlementDriver {
       }
     }
 
-    return this.awaitReceipt(prepared.reference);
+    // With no receipt for this hash, a nonce that was too low means a different
+    // transaction used it, so this one can never land. That is a definite
+    // answer, unlike an ordinary timeout.
+    return this.awaitReceipt(prepared.reference, nonceTooLow ? "NONCE_CONFLICT" : "RPC_UNAVAILABLE");
   }
 
-  private async awaitReceipt(hash: string): Promise<SettlementResponse> {
+  private async awaitReceipt(hash: string, unconfirmed: ErrorCode): Promise<SettlementResponse> {
     for (let attempt = 0; attempt < 30; attempt += 1) {
-      const receipt = await this.rpc.call<{ status?: string } | null>(
-        "eth_getTransactionReceipt",
-        [hash],
-      );
+      // One failed poll is not an outcome. The transaction may already be out,
+      // so keep polling rather than drop the hash on a transient error.
+      const receipt = await this.rpc
+        .call<{ status?: string } | null>("eth_getTransactionReceipt", [hash])
+        .catch(() => null);
 
       if (receipt) {
         return receipt.status === "0x1"
@@ -240,7 +259,7 @@ export class SafeAllowanceDriver implements SettlementDriver {
       success: false,
       transaction: hash,
       network: this.config.network,
-      errorReason: "RPC_UNAVAILABLE",
+      errorReason: unconfirmed,
     };
   }
 }

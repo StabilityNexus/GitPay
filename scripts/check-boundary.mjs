@@ -15,12 +15,12 @@ const RULES = [
   {
     id: "chain-library-import",
     why: "chain libraries and payment SDKs belong to a driver",
-    re: /\b(?:from|import|require\s*\()\s*["'](?:ethers|viem|thirdweb|web3|ox|x402|bn\.js|elliptic|keccak|js-sha3|@ethersproject\/[^"']+|@noble\/[^"']+|@x402\/[^"']+|@scure\/[^"']+|@solana\/[^"']+)["']/,
+    re: /\b(?:from|import(?:\s*\()?|require\s*\()\s*["'](?:ethers|viem|thirdweb|web3|ox|x402|bn\.js|elliptic|keccak|js-sha3|@ethersproject\/[^"']+|@noble\/[^"']+|@x402\/[^"']+|@scure\/[^"']+|@solana\/[^"']+)["']/,
   },
   {
     id: "driver-or-asset-import",
     why: "the boundary points one way: drivers may import core, never the reverse",
-    re: /\b(?:from|import|require\s*\()\s*["'][^"']*(?:\/drivers\/|\/assets\/|chains\.json)/,
+    re: /\b(?:from|import(?:\s*\()?|require\s*\()\s*["'][^"']*(?:\/drivers\/|\/assets\/|chains\.json)/,
   },
   {
     id: "hash-primitive",

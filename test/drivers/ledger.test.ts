@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { LedgerEntry, SettlementLedger } from "../../src/core/ledger.js";
+import { withAliases, type LedgerEntry, type SettlementLedger } from "../../src/core/ledger.js";
 import type { PaymentPayload, PaymentRequirements } from "../../src/core/types.js";
 import { DriverRegistry } from "../../src/drivers/registry.js";
 import type { Capabilities, SettlementDriver } from "../../src/drivers/types.js";
@@ -265,4 +265,25 @@ test("a failed broadcast still leaves a record, because it may have landed", asy
   // The record blocks an automatic retry — the outcome is genuinely unknown.
   const retry = await registry.settle(PAYLOAD, REQUIREMENTS, { idempotencyKey: KEY, ledger: l });
   assert.equal(retry.errorReason, "AUTH_ALREADY_USED");
+});
+
+test("a receipt under a legacy key spelling still blocks the re-pay, and new ones use the canonical key", async () => {
+  const legacy = KEY.replace("|0xdead|", "|inline:0xdead|");
+  const inner = ledger();
+  inner.entries.set(legacy, { status: "settled", transaction: "0xold" });
+
+  const registry = new DriverRegistry(0);
+  const d = driver();
+  registry.register(d);
+
+  const repeat = await registry.settle(PAYLOAD, REQUIREMENTS, {
+    idempotencyKey: KEY,
+    ledger: withAliases(inner, [legacy]),
+  });
+  assert.equal(repeat.errorReason, "AUTH_ALREADY_USED");
+  assert.equal(d.broadcast_, 0, "the legacy receipt must stop the second transfer");
+
+  const fresh = ledger();
+  await registry.settle(PAYLOAD, REQUIREMENTS, { idempotencyKey: KEY, ledger: withAliases(fresh, [legacy]) });
+  assert.deepEqual([...fresh.entries.keys()], [KEY], "only the canonical key is ever written");
 });

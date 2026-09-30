@@ -122,6 +122,11 @@ test("legacy receipts written before the marker carried a transaction still pars
   assert.equal(found?.transaction, "0xlegacy");
 });
 
+test("an explicit broadcasting status beats 'payout settled' in the prose", () => {
+  const body = `<!-- xops-receipt:v1 key=${KEY} status=broadcasting tx=0xabc -->\npayout settled?`;
+  assert.equal(findReceipt([{ body, ...BOT }], KEY)?.status, "broadcasting");
+});
+
 test("anything not explicitly settled is treated as in-flight", () => {
   const odd = `<!-- xops-receipt:v1 key=${KEY} status=weird tx=0xabc -->\nunknown`;
   assert.equal(findReceipt([{ body: odd, ...BOT }], KEY)?.status, "broadcasting");

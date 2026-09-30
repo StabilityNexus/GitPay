@@ -150,14 +150,15 @@ export function findReceipt(comments: readonly CommentLike[], key: string): Rece
     if (!isTrustedReceiptAuthor(comment)) continue;
 
     const transaction = marker["tx"] ?? LEGACY_TRANSACTION.exec(body)?.[1];
+    // The prose is read only for legacy receipts whose marker carries no
+    // status. An explicit status always wins, since the prose can say anything.
+    const status = marker["status"] ?? (body.includes("payout settled") ? "settled" : undefined);
     const receipt: Receipt = {
       key,
       // An unconfirmed record still blocks a re-pay. Reading it as anything
       // weaker would reintroduce the double-payment window it exists to close.
       // Anything that is not explicitly settled is treated as in-flight.
-      status: marker["status"] === "settled" || body.includes("payout settled")
-        ? "settled"
-        : "broadcasting",
+      status: status === "settled" ? "settled" : "broadcasting",
       ...(transaction === undefined ? {} : { transaction }),
     };
 

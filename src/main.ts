@@ -8,10 +8,11 @@ import { DEFAULT_SETTLEMENT_ENABLED, DEFAULT_SETTLEMENT_MODE } from "./core/defa
 import { XOpsError } from "./core/errors.js";
 import { canonical, keyFor } from "./core/idempotency.js";
 import { parseIntent } from "./core/intent.js";
+import { withAliases } from "./core/ledger.js";
 import { assertAllowed, evaluate, format } from "./core/policy.js";
 import { canonicalNetwork, lookupChain } from "./drivers/chains.js";
 import { DriverRegistry } from "./drivers/registry.js";
-import { InlineAddressResolver, ResolverChain } from "./resolvers/index.js";
+import { INLINE_PREFIX, InlineAddressResolver, ResolverChain } from "./resolvers/index.js";
 
 async function run(): Promise<number> {
   // L0 TRIGGER. A comment body, when given, is the source of truth for who gets
@@ -98,9 +99,24 @@ async function run(): Promise<number> {
   console.log(format(decision));
   assertAllowed(decision);
 
-  const idempotencyKey = canonical(keyFor(intent));
   const resolvers = new ResolverChain([new InlineAddressResolver()]);
   const target = await resolvers.resolve(intent.recipient, { rail: intent.network });
+
+  /**
+   * The key names the resolved address, not the identity as typed.
+   * `inline:0xabc` and `0xabc` are one payee. Keyed on the typed spelling, a
+   * payout sent one way and retried the other way would find no receipt, and
+   * this rail would transfer again.
+   *
+   * Receipts written before this change carry the `inline:` spelling. They are
+   * still looked up, but new ones are recorded only under the canonical key.
+   */
+  const key = keyFor(intent);
+  const idempotencyKey = canonical({ ...key, recipient: target.address });
+  const legacyKeys =
+    target.resolvedBy === "inline-address"
+      ? [canonical({ ...key, recipient: `${INLINE_PREFIX}${target.address}` })]
+      : [];
 
   console.log("intent:");
   console.log(JSON.stringify(intent, null, 2));
@@ -172,7 +188,9 @@ async function run(): Promise<number> {
   const registry = new DriverRegistry(1);
   registry.register(driver);
 
-  const ledger = new PullRequestReceiptLedger({
+  const explorerUrl = input("explorer_url") ?? chain?.explorer;
+
+  const receipts = new PullRequestReceiptLedger({
     repo:
       intent.source.platform === "github" ? intent.source.repo : intent.source.project,
     number: Number(required("pr")),
@@ -187,9 +205,10 @@ async function run(): Promise<number> {
       from: input("safe"),
       actor: intent.source.actor,
       network: intent.network,
-      explorerUrl: input("explorer_url") ?? chain?.explorer,
+      explorerUrl,
     },
   });
+  const ledger = withAliases(receipts, legacyKeys);
 
   const requirements = registry.buildRequirements({ intent, target, idempotencyKey });
   const verified = await driver.verify(
@@ -216,6 +235,10 @@ async function run(): Promise<number> {
   writeOutputs({
     STATUS: response.success ? (alreadyPaid ? "already-paid" : "settled") : "error",
     TX_HASH: response.transaction ?? "",
+    EXPLORER_URL:
+      explorerUrl && response.transaction
+        ? `${explorerUrl.replace(/\/+$/, "")}/tx/${response.transaction}`
+        : "",
     IDEMPOTENCY_KEY: idempotencyKey,
     ERROR_CODE: response.success ? "" : (response.errorReason ?? ""),
   });
@@ -231,7 +254,7 @@ run().then(
     const code = err instanceof XOpsError ? err.code : "";
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
-    writeOutputs({ STATUS: "error", ERROR_CODE: code });
+    writeOutputs({ STATUS: "error", TX_HASH: "", EXPLORER_URL: "", ERROR_CODE: code });
     process.exitCode = 1;
   },
 );

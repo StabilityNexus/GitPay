@@ -448,6 +448,7 @@ Core never reads inside `payload`. Only `drivers/exact-eip155` does.
 | `INSUFFICIENT_GAS` | Gas wallet empty | Fund `0x…` with native token | user |
 | `SIMULATION_REVERT` | `eth_call` reverted | Decoded revert reason | no |
 | `RPC_UNAVAILABLE` | All endpoints failed | Retryable; set `rpc_url` to override | auto |
+| `NONCE_CONFLICT` | Another tx used this payout's nonce | Not sent; check the account, retry with a new `round` | user |
 | `DRIVER_NOT_FOUND` | No driver for pair | Unsupported network/scheme | no |
 | `TIER_VIOLATION` | Driver needs secrets or custody in Tier 0 | Run your own facilitator | no |
 | `NO_REPLAY_PROTECTION` | Driver lacks exactly-once guarantee | Cannot settle in Tier 0 | no |
