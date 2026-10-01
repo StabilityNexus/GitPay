@@ -24,7 +24,7 @@ settled
 
 ### 20 consecutive settlements, with replays
 
-On [demo-XOps#3](https://github.com/kpj2006/demo-XOps/pull/3), 2026-10-01. Twenty `/send`
+On [demo-XOps#3](https://github.com/kpj2006/demo-XOps/pull/3), 2026-09-30 between 23:21 and 23:38 UTC. Twenty `/send`
 comments in a row, each to a distinct address, with no failure between them. After every fifth,
 an already-paid payout was sent again (↺). Each replay reported `already-paid` against its
 original transaction, and none moved funds.
