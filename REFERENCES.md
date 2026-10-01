@@ -177,6 +177,7 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 - [x] `dist/` rebuild is byte-identical to committed (I12)
 - [x] Layer-boundary grep is clean (I1)
 - [ ] SBOM and build provenance published
+      (`.github/workflows/release.yml` produces both on a version tag; ticks on the first release)
 
 **Operational**
 - [ ] A real payout settles from an actual merged PR, end to end
