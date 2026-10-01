@@ -1,4 +1,4 @@
-# Contributing to GitPay
+# Contributing to TODO: Project Name
 
 ⭐ First off, thank you for considering contributing to this project! ⭐
 
@@ -68,11 +68,7 @@ What we expect:
 
 ### Prerequisites
 
-- Node.js ≥ 20
-- npm
-
-No accounts, secrets, or wallets are needed — everything defaults to `mode: dry-run` and the
-checks run fully offline.
+TODO: List prerequisites specific to your project
 
 ### Setup
 
@@ -83,23 +79,25 @@ checks run fully offline.
 
 2. **Clone Your Fork**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/GitPay.git
-   cd GitPay
+   git clone https://github.com/YOUR_USERNAME/TODO.git
+   cd TODO
    ```
 
 3. **Add Upstream Remote**
    ```bash
-   git remote add upstream https://github.com/StabilityNexus/GitPay.git
+   git remote add upstream https://github.com/AOSSIE-Org/TODO.git
    ```
 
 4. **Install Dependencies**
    ```bash
    npm install
+   # or yarn install
+   # or pnpm install
    ```
 
-5. **Run the Checks**
+5. **Run the Project**
    ```bash
-   npm run check
+   npm run dev
    ```
 
 ## 🔄 Development Workflow
@@ -123,13 +121,12 @@ git checkout -b fix/your-bug-fix
 
 ### 3. Test Your Changes
 
+TODO: Add project-specific testing instructions
+
 ```bash
-npm run check   # lint + layer-boundary check + dependency-count check + tests
-# or individually:
-npm run lint
 npm test
-npm run check:boundary
-npm run check:deps
+# or
+npm run lint
 ```
 
 ### 4. Commit Your Changes
@@ -226,9 +223,7 @@ Steps to test the changes
 
 ## 📝 Code Style Guidelines
 
-See [AGENTS.md](./AGENTS.md) for the project's authoritative, non-negotiable rules — the layer
-boundary between `src/core`/`src/adapters` and the drivers, the dependency-count cap, and the
-idempotency conventions. CI enforces these on every push.
+TODO: Add project-specific code style guidelines
 
 ### General Guidelines
 
@@ -239,11 +234,16 @@ idempotency conventions. CI enforces these on every push.
 - Avoid code duplication
 - Avoid unnecessary complexity and minor over-optimization
 
-### TypeScript
+### JavaScript/TypeScript
 - Use ES6+ syntax
 - Prefer `const` over `let`, avoid `var`
 - Use arrow functions where appropriate
 - Follow ESLint rules
+
+### Python
+- Follow PEP 8 style guide
+- Use type hints where applicable
+- Write docstrings for functions/classes
 
 ## 🔧 Debugging Pre-commit Hooks
 
@@ -538,4 +538,4 @@ If you encounter issues not covered here:
 - Check for existing PRs before starting to avoid duplication, as there might PRs that didn't mention the related issue
 
 
-Thank you for contributing to GitPay! Your efforts help make this project better for everyone. 🚀
+Thank you for contributing to TODO! Your efforts help make this project better for everyone. 🚀

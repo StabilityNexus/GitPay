@@ -13,7 +13,6 @@ Fixes #(issue number)
 
 ## Checklist
 <!-- Mark items with [x] to indicate completion -->
-- [ ] My PR addresses a single issue
 - [ ] My code follows the project's code style and conventions
 - [ ] I have made corresponding changes to the documentation
 - [ ] My changes generate no new warnings or errors
