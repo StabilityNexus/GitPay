@@ -103,9 +103,11 @@ jobs:
         run: |
           major="${TAG%%.*}"
           sha="$(git rev-parse HEAD)"
-          ref="repos/$GITHUB_REPOSITORY/git/refs/tags/$major"
-          if gh api "$ref" >/dev/null 2>&1; then
-            gh api -X PATCH "$ref" -f sha="$sha" -F force=true >/dev/null
+          # `git/ref` (singular) is an exact lookup. `git/refs/tags/v1` is a prefix
+          # match: with no v1 yet it returns [v1.0.0], reads as "exists", and the
+          # PATCH below then fails with 422 "Reference does not exist".
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$major" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$major" -f sha="$sha" -F force=true >/dev/null
           else
             gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$major" -f sha="$sha" >/dev/null
           fi
