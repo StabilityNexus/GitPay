@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// `node --test` accepts glob patterns only on Node 22+ and directory arguments
-// inconsistently across platforms. CI runs Node 20 to match the action runtime,
-// so enumerate the compiled test files and hand them over explicitly.
+// `node --test` accepts glob patterns only on Node 22+, and directory arguments
+// inconsistently across platforms. Enumerating the compiled test files and
+// handing them over explicitly behaves the same on every supported Node.
 
 import { readdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";

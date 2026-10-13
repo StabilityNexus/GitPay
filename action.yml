@@ -155,5 +155,5 @@ outputs:
     description: "Canonical key this run derived. Identical inputs reproduce it."
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "dist/index.js"

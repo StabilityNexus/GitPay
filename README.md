@@ -84,7 +84,7 @@ secrets required in the default configuration.
 ## 💻 Tech Stack
 
 - **Runtime:** Node.js ≥ 20, TypeScript, bundled with `@vercel/ncc` into a committed `dist/`
-- **Distribution:** GitHub Action (`action.yml`, `using: node20`)
+- **Distribution:** GitHub Action (`action.yml`, `using: node24`)
 - **Protocol:** [x402 v2](https://github.com/x402-foundation/x402) — `exact` scheme, EIP-3009 /
   EIP-712, CAIP-2 network identifiers
 - **Chain (Tier 1 target):** Base Sepolia, USDC — see `assets/chains.json`
