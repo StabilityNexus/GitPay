@@ -178,8 +178,10 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 - [x] `npm ls --omit=dev --all` ≤ 2 packages (I11)
 - [x] `dist/` rebuild is byte-identical to committed (I12)
 - [x] Layer-boundary grep is clean (I1)
-- [ ] SBOM and build provenance published
-      (`.github/workflows/release.yml` produces both on a version tag; ticks on the first release)
+- [x] SBOM and build provenance published
+      ([`v1.0.0` release](https://github.com/StabilityNexus/GitPay/releases/tag/v1.0.0) carries `gitpay.cdx.json` and `SHA256SUMS`; build-provenance
+      and SBOM attestations for `dist/index.js` from [release run](https://github.com/StabilityNexus/GitPay/actions/runs/38351171554). Check with
+      `gh attestation verify dist/index.js --repo StabilityNexus/GitPay`)
 
 **Operational**
 - [x] A real payout settles from an actual merged PR, end to end
@@ -200,7 +202,7 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 - [x] Config schema frozen and published as JSON Schema
       ([`schema/action-inputs.v1.schema.json`](schema/action-inputs.v1.schema.json), kept in step
       with `action.yml` by `test/manifest.test.ts`)
-- [ ] `v1.0.0` tagged
+- [x] `v1.0.0` tagged ([release](https://github.com/StabilityNexus/GitPay/releases/tag/v1.0.0), commit `a98168f`, 2026-10-13 UTC)
 
 **Custody, stated honestly.** This gate does not claim the operator holds no key. It claims the
 key's authority is bounded on-chain and revocable: the delegate can move at most one period's
