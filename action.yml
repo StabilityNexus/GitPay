@@ -1,5 +1,5 @@
 name: "GitPay"
-description: "CI/CD-native value transfer. A repository event produces a payment intent, a human signs it, the workflow settles it."
+description: "CI/CD-native value transfer. A repository event produces a payment intent, declared policy approves it, the workflow settles it from your Safe."
 author: "StabilityNexus"
 branding:
   icon: "git-merge"
