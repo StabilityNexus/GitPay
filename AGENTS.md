@@ -139,9 +139,11 @@ adopter-operated process with its own credentials. I3 rejecting it at Tier 0 is 
 "fix" it by flipping the capability.
 
 The claim is not "no key in CI". It is: **the key's authority is bounded on-chain and
-revocable.** A leaked delegate key can move at most one period's allowance, to any address,
-until a Safe owner removes the delegate. Adopters should size the period cap at what they can
-afford to lose in one period. Full blast-radius reading: `DECISION-LOG.md` §6a.
+revocable.** A leaked delegate key can move up to the allowance in every period, to any
+address, until a Safe owner removes the delegate. The cap resets automatically, so losses are
+**cumulative**: a key that stays authorized across N resets can drain N periods' worth, bounded
+only by the Safe's balance. Size the period cap at what you can afford to lose in one period,
+and revoke the delegate as soon as a leak is suspected — the reset timer is not on your side. Full blast-radius reading: `DECISION-LOG.md` §6a.
 
 Registry error message when I3 fires (`src/drivers/registry.ts`):
 
@@ -203,10 +205,16 @@ Not built: the CLI (`npx gitpay …`) — cut from the MVP (`DECISION-LOG.md` §
 5. **Prepare** (driver): refuse if the delegate already has a transaction in flight
    (`pending > latest` nonce) rather than queue behind it; simulate with `eth_call`; estimate
    gas; sign. Nothing on-chain changes.
-6. **Write the ledger entry before broadcast.** The transaction hash is fixed at signing time, so
-   it is recorded first. If the write fails, the payout is refused rather than settled
-   unrecorded.
-7. **Broadcast**, then post the receipt and write outputs.
+6. **Write the ledger entry before broadcast**, with `status=broadcasting`. The transaction hash
+   is fixed at signing time, so it is recorded first. If the write fails, the payout is refused
+   having moved nothing.
+7. **Broadcast**, then update the receipt to `status=settled` and write outputs. A failure to
+   update is logged and ignored — the `broadcasting` record already carries the hash.
+
+A `broadcasting` receipt means **outcome unknown**: the transaction may have landed, or the run
+may have died between steps 6 and 7 and nothing was sent. A later run treats it as
+`AUTH_ALREADY_USED` regardless, because paying again "to make sure" is the one unrecoverable
+mistake. A human checks the hash on the explorer and, if it never landed, bumps `round`.
 
 ---
 
@@ -332,8 +340,10 @@ them, and do not add the networks themselves.
 - **Never cancel a payout run in progress.** `cancel-in-progress: false` in every adopter
   template.
 - **Untrusted comments never mark a payout as paid.** Only bot and maintainer receipts count.
-- Remaining risk, known: if `record()` fails *after* a successful transfer, a re-run would pay
-  again. It fails loudly; there is no automatic repair yet.
+- Remaining risk, known: a run that dies after the ledger write and before broadcast leaves a
+  `broadcasting` receipt for a payout that never happened. That fails toward **under**-paying —
+  the contributor is not paid until a human checks the explorer and bumps `round`. There is no
+  automatic repair; a double payment is the failure this ordering exists to rule out.
 
 ---
 

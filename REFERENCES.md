@@ -7,19 +7,21 @@ or produced by a passing test on **15 Aug 2026**. When in doubt, prefer this fil
 
 ## 1. Version pins
 
+What ships in `v1.0.0` (exact-pinned in `package.json`, I13):
+
 ```json
 {
   "dependencies": {
-    "@noble/curves": "2.3.0",
-    "@noble/hashes": "2.3.0"
+    "@noble/curves": "1.9.2",
+    "@noble/hashes": "1.8.0"
   }
 }
 ```
 
-| Package | Current | Published | Note |
+| Package | Pinned | Latest checked | Note |
 |---|---|---|---|
-| `@noble/curves` | 2.3.0 | 2026-08-06 | runtime |
-| `@noble/hashes` | 2.3.0 | 2026-08-06 | runtime |
+| `@noble/curves` | 1.9.2 | 2.3.0 (2026-08-06) | runtime. v2 changes import paths (`.js` suffixes) — bump by hand, re-run the golden vectors, never via Dependabot |
+| `@noble/hashes` | 1.8.0 | 2.3.0 (2026-08-06) | runtime. Same as above |
 | `@x402/core` | 2.22.0 | 2026-08-11 | **devDependency only** — schema validation in tests |
 | `@x402/evm` | 2.22.0 | 2026-08-11 | not used; ≥2.22.0 if ever needed (2.9.0–2.11.0 broken on Monad) |
 | `x402` (legacy, unscoped) | 1.2.0 | 2026-04-16 | **do not use** — superseded by scoped packages |
@@ -356,6 +358,11 @@ export interface VerifyResult {
 
 ## 4. Verified EIP-3009 primitives
 
+> **Deferred — not in `v1.0.0` scope.** This section documents the x402 `exact` / EIP-3009 design
+> that the Safe AllowanceModule model superseded (`DECISION-LOG.md` §4). It is kept as
+> reference for a possible later driver. Do not implement from it; `AGENTS.md` → Scope lists
+> this driver under "specify, do not build".
+
 Source of truth: `x402-min.js` (all assertions passing). Do not reimplement from memory.
 
 **Imports** — note the explicit `.js` extensions, required by noble v2 ESM:
@@ -433,6 +440,11 @@ full calldata. Regenerate only deliberately — a diff here means signing change
 ---
 
 ## 5. x402 payload shape
+
+> **Deferred — not in `v1.0.0` scope.** This section documents the x402 `exact` / EIP-3009 design
+> that the Safe AllowanceModule model superseded (`DECISION-LOG.md` §4). It is kept as
+> reference for a possible later driver. Do not implement from it; `AGENTS.md` → Scope lists
+> this driver under "specify, do not build".
 
 ```jsonc
 {
