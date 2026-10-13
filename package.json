@@ -1,8 +1,8 @@
 {
   "name": "gitpay",
-  "version": "0.1.0-dev",
+  "version": "1.0.0",
   "private": true,
-  "description": "CI/CD-native value transfer engine. A repository event produces a payment intent, a human signs it, the workflow settles it.",
+  "description": "CI/CD-native value transfer engine. A repository event produces a payment intent, declared policy approves it, the workflow settles it from your Safe.",
   "license": "MIT",
   "type": "module",
   "engines": {
