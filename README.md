@@ -124,20 +124,62 @@ L0 TRIGGER       repo event → Intent
 
 ### Using the Action
 
-No secrets are required for the default `dry-run` path:
+Add one file. No secrets are needed: the default mode is `dry-run`, which reads the command,
+checks policy and reports what it would pay, and moves nothing.
 
 ```yaml
-# .github/workflows/reward.yml
+# .github/workflows/gitpay.yml
+name: GitPay
 on:
-  issue_comment: { types: [created] }
-permissions: { issues: write, pull-requests: write }
+  issue_comment:
+    types: [created]
+permissions:
+  issues: write
+  pull-requests: write
 jobs:
   pay:
-    if: startsWith(github.event.comment.body, '/send')
+    # A `/send <recipient> <amount>` comment on a pull request.
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/send')
     runs-on: ubuntu-latest
     steps:
       - uses: StabilityNexus/GitPay@v1
+        with:
+          comment: ${{ github.event.comment.body }}
+          actor_association: ${{ github.event.comment.author_association }}
+          # Ties the payout to this PR, so a re-run can never pay it twice.
+          ref: refs/pull/${{ github.event.issue.number }}
 ```
+
+Then comment `/send 0xRecipientAddress 1 USDC` on a pull request. The run log shows the parsed
+payout, the policy checks, and the idempotency key, and ends with
+`mode: dry-run — nothing was settled`.
+[kpj2006/gitpay-quickstart](https://github.com/kpj2006/gitpay-quickstart) is this file and
+nothing else.
+
+**Going live.** Create a Safe on Ethereum Sepolia, and in Safe{Wallet} give a delegate address
+a spending limit (Settings → Setup → Spending limits). Then add these inputs, keeping the key and
+the RPC URL in repository secrets, and serialize payouts so two runs never sign at once:
+
+```yaml
+concurrency:
+  group: gitpay-payout-${{ github.repository }}
+  cancel-in-progress: false
+# …
+        with:
+          # the three inputs above, plus:
+          mode: self
+          max_per_payout: "5"          # the largest single payout, in /send units
+          rpc_url: ${{ secrets.GITPAY_RPC_URL }}
+          safe: "0xYourSafe"
+          token: "0xYourToken"
+          delegate_key: ${{ secrets.GITPAY_DELEGATE_KEY }}
+          pr: ${{ github.event.issue.number }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+[SETTLEMENT-FLOW.md](./SETTLEMENT-FLOW.md) explains what the delegate can and cannot do, and
+[`schema/action-inputs.v1.schema.json`](./schema/action-inputs.v1.schema.json) describes every
+input.
 
 ### Developing Locally
 
