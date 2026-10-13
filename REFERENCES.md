@@ -177,6 +177,7 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 - [x] `dist/` rebuild is byte-identical to committed (I12)
 - [x] Layer-boundary grep is clean (I1)
 - [ ] SBOM and build provenance published
+      (`.github/workflows/release.yml` produces both on a version tag; ticks on the first release)
 
 **Operational**
 - [x] A real payout settles from an actual merged PR, end to end
@@ -187,7 +188,13 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
       (20 in a row with 4 replays on [demo-XOps#3](https://github.com/kpj2006/demo-XOps/pull/3),
       each checked on-chain; every transaction and run is listed in
       [`docs/VERIFIED_CHAINS.md`](docs/VERIFIED_CHAINS.md))
-- [ ] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
+- [x] A fresh repo integrates in under 5 minutes with zero secrets, in dry-run
+      ([kpj2006/gitpay-quickstart](https://github.com/kpj2006/gitpay-quickstart): one file, three
+      inputs, no secrets; 27 s from adding the workflow to a green dry-run,
+      [run 36793374394](https://github.com/kpj2006/gitpay-quickstart/actions/runs/36793374394).
+      The first attempt used the README snippet verbatim and failed with
+      [`Missing required intent field: recipient`](https://github.com/kpj2006/gitpay-quickstart/actions/runs/36792964834),
+      which is why the README's snippet was rewritten)
 - [ ] Config schema frozen and published as JSON Schema
 - [ ] `v1.0.0` tagged
 
