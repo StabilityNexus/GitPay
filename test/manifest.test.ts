@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { DEFAULT_MAINTAINER_ASSOCIATIONS } from "../src/adapters/github/trigger.js";
-import { DEFAULT_SETTLEMENT_ENABLED } from "../src/core/defaults.js";
+import { DEFAULT_SETTLEMENT_ENABLED, SUPPORTED_SETTLEMENT_MODES } from "../src/core/defaults.js";
 import { canonicalNetwork, lookupChain } from "../src/drivers/chains.js";
 import { SAFE_ALLOWANCE_SCHEME } from "../src/drivers/safe-allowance/driver.js";
 
@@ -136,4 +136,65 @@ test("declared inputs are readable as blank without breaking fallbacks", () => {
     assert.ok(declared.has(optional), `${optional} should be declared`);
     assert.equal(declared.get(optional)?.default, undefined, `${optional} should have no default`);
   }
+});
+
+// --- The published input schema (schema/action-inputs.v1.schema.json) ---
+
+interface Property {
+  type: string;
+  pattern?: string;
+  enum?: string[];
+  default?: string;
+}
+
+const schema = JSON.parse(
+  readFileSync(join(process.cwd(), "schema", "action-inputs.v1.schema.json"), "utf8"),
+) as { additionalProperties: boolean; properties: Record<string, Property> };
+
+/** Only the keywords this schema uses. A full validator is not worth a dependency. */
+function accepts(property: Property, value: string): boolean {
+  if (property.enum && !property.enum.includes(value)) return false;
+  if (property.pattern && !new RegExp(property.pattern).test(value)) return false;
+  return true;
+}
+
+test("the schema describes exactly the inputs action.yml declares", () => {
+  const declared = [...inputs().keys()].sort();
+  const described = Object.keys(schema.properties).sort();
+  assert.deepEqual(described, declared, "schema and action.yml have drifted apart");
+  assert.equal(schema.additionalProperties, false, "an unknown input must not validate");
+});
+
+test("every schema default is action.yml's default, and passes its own schema", () => {
+  for (const [name, { default: declared }] of inputs()) {
+    const property = schema.properties[name] as Property;
+    assert.equal(property.default, declared, `${name}: default differs from action.yml`);
+    if (declared !== undefined) {
+      assert.ok(accepts(property, declared), `${name}: action.yml default "${declared}" fails the schema`);
+    }
+  }
+});
+
+test("the schema's closed sets are the code's closed sets", () => {
+  assert.deepEqual(schema.properties["mode"]?.enum, [...SUPPORTED_SETTLEMENT_MODES]);
+  assert.deepEqual(schema.properties["scheme"]?.enum, [SAFE_ALLOWANCE_SCHEME]);
+});
+
+test("the schema accepts a real configuration and refuses the mistakes that cost money", () => {
+  const p = (name: string) => schema.properties[name] as Property;
+
+  // The demo repo's configuration, as GitHub resolves it.
+  assert.ok(accepts(p("network"), "sepolia"));
+  assert.ok(accepts(p("network"), "eip155:11155111"));
+  assert.ok(accepts(p("ref"), "refs/pull/3"));
+  assert.ok(accepts(p("max_per_payout"), "5"));
+  assert.ok(accepts(p("allowed_associations"), "OWNER, MEMBER,COLLABORATOR"));
+  assert.ok(accepts(p("safe"), "0x5b7d5882058e001c5502cbf5c2497ec5da54e6e2"));
+
+  assert.ok(!accepts(p("mode"), "dryrun"), "a mistyped mode must not validate (I5)");
+  assert.ok(!accepts(p("amount"), "2.5"), "amount is atomic units, never a decimal");
+  assert.ok(!accepts(p("max_per_payout"), "5 USDC"));
+  assert.ok(!accepts(p("enabled"), "no"), "the kill switch takes only true or false");
+  assert.ok(!accepts(p("asset"), "US DC"), "whitespace would break the idempotency key");
+  assert.ok(!accepts(p("ref"), "refs/pull/1|x"), "a delimiter would break the idempotency key");
 });

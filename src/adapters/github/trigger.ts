@@ -99,8 +99,7 @@ const KNOWN_ASSOCIATIONS = new Set([
  * An unrecognized entry **warns and is kept** rather than failing the run. A
  * typo can only ever narrow an allowlist — `OWNERS` matches nobody — so the
  * consequence is a denied payout, never an unintended one. Failing outright
- * would instead break every run the day GitHub adds an association value. This
- * follows the `.gitpay.yml` convention: unknown keys warn, never fail.
+ * would instead break every run the day GitHub adds an association value.
  *
  * An empty or blank list falls back to the default. Reading it as "allow
  * nobody" would be defensible, but a blank input is far more likely to be an

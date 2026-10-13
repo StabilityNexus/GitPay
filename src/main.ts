@@ -4,7 +4,7 @@ import { PullRequestReceiptLedger } from "./adapters/github/receipts.js";
 import { SafeAllowanceDriver } from "./drivers/safe-allowance/driver.js";
 import { isMaintainer, parseAssociations, parseSendCommand } from "./adapters/github/trigger.js";
 import { toAtomic } from "./core/amount.js";
-import { DEFAULT_SETTLEMENT_ENABLED, DEFAULT_SETTLEMENT_MODE } from "./core/defaults.js";
+import { DEFAULT_SETTLEMENT_ENABLED, parseSettlementMode } from "./core/defaults.js";
 import { GitPayError } from "./core/errors.js";
 import { canonical, keyFor } from "./core/idempotency.js";
 import { parseIntent } from "./core/intent.js";
@@ -15,6 +15,10 @@ import { DriverRegistry } from "./drivers/registry.js";
 import { INLINE_PREFIX, InlineAddressResolver, ResolverChain } from "./resolvers/index.js";
 
 async function run(): Promise<number> {
+  // First, before anything is parsed or resolved: an unknown mode is refused
+  // rather than read as "not dry-run", which would settle on a typo (I5).
+  const mode = parseSettlementMode(input("mode"));
+
   // L0 TRIGGER. A comment body, when given, is the source of truth for who gets
   // paid and how much — it beats the workflow's static inputs, because a person
   // typed it deliberately.
@@ -124,7 +128,6 @@ async function run(): Promise<number> {
   console.log(JSON.stringify(target, null, 2));
   console.log(`idempotency key: ${idempotencyKey}`);
 
-  const mode = input("mode") ?? DEFAULT_SETTLEMENT_MODE;
   if (mode === "dry-run") {
     console.log("mode: dry-run — nothing was settled.");
     writeOutputs({ STATUS: "dry-run", IDEMPOTENCY_KEY: idempotencyKey, ERROR_CODE: "" });
