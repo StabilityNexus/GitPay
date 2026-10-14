@@ -28,7 +28,8 @@ const CHAIN_LIBRARIES = [
 const WRONG_DIRECTION = ["**/drivers", "**/drivers/*", "**/drivers/**", "**/assets/*"];
 
 export default tseslint.config(
-  { ignores: ["dist/", "build/", "node_modules/", "signer/", "dangerfile.js"] },
+  // frontend/ is the marketing site: its own package, tsconfig and build.
+  { ignores: ["dist/", "build/", "node_modules/", "signer/", "dangerfile.js", "frontend/"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
