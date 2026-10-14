@@ -2,7 +2,12 @@ import { readInput as input } from "./adapters/github/inputs.js";
 import { writeOutputs } from "./adapters/github/outputs.js";
 import { PullRequestReceiptLedger } from "./adapters/github/receipts.js";
 import { SafeAllowanceDriver } from "./drivers/safe-allowance/driver.js";
-import { isMaintainer, parseAssociations, parseSendCommand } from "./adapters/github/trigger.js";
+import {
+  isMaintainer,
+  parseAssociations,
+  parseSendCommand,
+  resolveCommandAsset,
+} from "./adapters/github/trigger.js";
 import { toAtomic } from "./core/amount.js";
 import { DEFAULT_SETTLEMENT_ENABLED, parseSettlementMode } from "./core/defaults.js";
 import { GitPayError } from "./core/errors.js";
@@ -52,6 +57,12 @@ async function run(): Promise<number> {
   const network =
     requestedNetwork === undefined ? undefined : canonicalNetwork(requestedNetwork);
 
+  // A `/send` may name the asset only to confirm it; the workflow's `token` is
+  // what pays, and the workflow's spelling is what reaches the key.
+  const asset = command
+    ? resolveCommandAsset(command.asset, input("asset"))
+    : input("asset");
+
   const intent = parseIntent({
     platform: "github",
     repo: input("repo") ?? process.env["GITHUB_REPOSITORY"],
@@ -59,7 +70,7 @@ async function run(): Promise<number> {
     actor: input("actor") ?? process.env["GITHUB_ACTOR"],
     recipient: command?.recipient ?? input("recipient"),
     amount: command ? toAtomic(command.amount, decimals) : input("amount"),
-    asset: command?.asset ?? input("asset"),
+    asset,
     network,
     scheme: input("scheme"),
     round: input("round"),
@@ -114,13 +125,25 @@ async function run(): Promise<number> {
    *
    * Receipts written before this change carry the `inline:` spelling. They are
    * still looked up, but new ones are recorded only under the canonical key.
+   *
+   * The same goes for the asset. Before `resolveCommandAsset`, a `/send` that
+   * typed `usdc` was keyed `usdc`; now it is keyed with the workflow's `USDC`.
+   * The typed spelling is still looked up, so a payout made under it is found
+   * rather than paid again.
    */
   const key = keyFor(intent);
   const idempotencyKey = canonical({ ...key, recipient: target.address });
-  const legacyKeys =
-    target.resolvedBy === "inline-address"
-      ? [canonical({ ...key, recipient: `${INLINE_PREFIX}${target.address}` })]
-      : [];
+  const recipientSpellings = [
+    target.address,
+    ...(target.resolvedBy === "inline-address" ? [`${INLINE_PREFIX}${target.address}`] : []),
+  ];
+  const assetSpellings = [
+    intent.asset,
+    ...(command?.asset !== undefined && command.asset !== intent.asset ? [command.asset] : []),
+  ];
+  const legacyKeys = assetSpellings
+    .flatMap((a) => recipientSpellings.map((r) => canonical({ ...key, asset: a, recipient: r })))
+    .filter((k) => k !== idempotencyKey);
 
   console.log("intent:");
   console.log(JSON.stringify(intent, null, 2));

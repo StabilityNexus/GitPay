@@ -70,6 +70,44 @@ export function parseSendCommand(body: string): SendCommand | undefined {
 }
 
 /**
+ * Reconciles the asset a `/send` names with the one the workflow pays in, and
+ * returns the workflow's spelling.
+ *
+ * A `/send` cannot choose the token: the driver always pays the workflow's
+ * `token` input. So an asset word that disagrees with the workflow is refused
+ * rather than recorded — `/send 0xabc 25 DAI` on a USDC workflow would
+ * otherwise pay 25 USDC under a receipt that says DAI.
+ *
+ * The workflow's spelling, not the typed one, is what reaches the idempotency
+ * key. `asset` is a key field, so `USDC`, `usdc` and `Usdc` kept as typed would
+ * be three keys for one payout, and the same person could be paid three times
+ * on one PR with no `round` bump. Matching is case-insensitive for that reason:
+ * the symbol is a label for the configured token, never a second token.
+ *
+ * A named asset with no configured one is refused too, because there is then
+ * nothing to check it against.
+ */
+export function resolveCommandAsset(
+  named: string | undefined,
+  configured: string | undefined,
+): string | undefined {
+  if (named === undefined) return configured;
+  if (configured === undefined) {
+    throw new Error(
+      `\`/send\` names "${named}", but this workflow sets no \`asset\` input to check it ` +
+        "against. Set `asset` to the symbol of the `token` the workflow pays in.",
+    );
+  }
+  if (named.toLowerCase() !== configured.toLowerCase()) {
+    throw new Error(
+      `\`/send\` names "${named}", but this workflow pays in ${configured}. A \`/send\` ` +
+        `cannot choose the token. Name ${configured}, or leave the asset out. ${USAGE}`,
+    );
+  }
+  return configured;
+}
+
+/**
  * Author associations GitHub reports for people who can be trusted to spend the
  * project's money. Everything else — CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR, NONE —
  * is denied by default, so a drive-by commenter cannot trigger a payout to

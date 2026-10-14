@@ -4882,6 +4882,37 @@ function parseSendCommand(body) {
     return undefined;
 }
 /**
+ * Reconciles the asset a `/send` names with the one the workflow pays in, and
+ * returns the workflow's spelling.
+ *
+ * A `/send` cannot choose the token: the driver always pays the workflow's
+ * `token` input. So an asset word that disagrees with the workflow is refused
+ * rather than recorded — `/send 0xabc 25 DAI` on a USDC workflow would
+ * otherwise pay 25 USDC under a receipt that says DAI.
+ *
+ * The workflow's spelling, not the typed one, is what reaches the idempotency
+ * key. `asset` is a key field, so `USDC`, `usdc` and `Usdc` kept as typed would
+ * be three keys for one payout, and the same person could be paid three times
+ * on one PR with no `round` bump. Matching is case-insensitive for that reason:
+ * the symbol is a label for the configured token, never a second token.
+ *
+ * A named asset with no configured one is refused too, because there is then
+ * nothing to check it against.
+ */
+function resolveCommandAsset(named, configured) {
+    if (named === undefined)
+        return configured;
+    if (configured === undefined) {
+        throw new Error(`\`/send\` names "${named}", but this workflow sets no \`asset\` input to check it ` +
+            "against. Set `asset` to the symbol of the `token` the workflow pays in.");
+    }
+    if (named.toLowerCase() !== configured.toLowerCase()) {
+        throw new Error(`\`/send\` names "${named}", but this workflow pays in ${configured}. A \`/send\` ` +
+            `cannot choose the token. Name ${configured}, or leave the asset out. ${USAGE}`);
+    }
+    return configured;
+}
+/**
  * Author associations GitHub reports for people who can be trusted to spend the
  * project's money. Everything else — CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR, NONE —
  * is denied by default, so a drive-by commenter cannot trigger a payout to
@@ -5649,6 +5680,11 @@ async function run() {
      */
     const requestedNetwork = readInput("network");
     const network = requestedNetwork === undefined ? undefined : canonicalNetwork(requestedNetwork);
+    // A `/send` may name the asset only to confirm it; the workflow's `token` is
+    // what pays, and the workflow's spelling is what reaches the key.
+    const asset = command
+        ? resolveCommandAsset(command.asset, readInput("asset"))
+        : readInput("asset");
     const intent = parseIntent({
         platform: "github",
         repo: readInput("repo") ?? process.env["GITHUB_REPOSITORY"],
@@ -5656,7 +5692,7 @@ async function run() {
         actor: readInput("actor") ?? process.env["GITHUB_ACTOR"],
         recipient: command?.recipient ?? readInput("recipient"),
         amount: command ? toAtomic(command.amount, decimals) : readInput("amount"),
-        asset: command?.asset ?? readInput("asset"),
+        asset,
         network,
         scheme: readInput("scheme"),
         round: readInput("round"),
@@ -5703,12 +5739,25 @@ async function run() {
      *
      * Receipts written before this change carry the `inline:` spelling. They are
      * still looked up, but new ones are recorded only under the canonical key.
+     *
+     * The same goes for the asset. Before `resolveCommandAsset`, a `/send` that
+     * typed `usdc` was keyed `usdc`; now it is keyed with the workflow's `USDC`.
+     * The typed spelling is still looked up, so a payout made under it is found
+     * rather than paid again.
      */
     const key = keyFor(intent);
     const idempotencyKey = canonical({ ...key, recipient: target.address });
-    const legacyKeys = target.resolvedBy === "inline-address"
-        ? [canonical({ ...key, recipient: `${INLINE_PREFIX}${target.address}` })]
-        : [];
+    const recipientSpellings = [
+        target.address,
+        ...(target.resolvedBy === "inline-address" ? [`${INLINE_PREFIX}${target.address}`] : []),
+    ];
+    const assetSpellings = [
+        intent.asset,
+        ...(command?.asset !== undefined && command.asset !== intent.asset ? [command.asset] : []),
+    ];
+    const legacyKeys = assetSpellings
+        .flatMap((a) => recipientSpellings.map((r) => canonical({ ...key, asset: a, recipient: r })))
+        .filter((k) => k !== idempotencyKey);
     console.log("intent:");
     console.log(JSON.stringify(intent, null, 2));
     console.log("payout target:");

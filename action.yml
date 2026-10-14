@@ -9,9 +9,11 @@ inputs:
   comment:
     description: >
       A PR comment body to read a `/send <recipient> <amount> [asset]` command from.
-      When given, the command overrides the `recipient`, `amount` and `asset` inputs,
-      and the amount is treated as human decimal rather than atomic units. A comment
-      with no `/send` line reports STATUS=skipped and does nothing.
+      When given, the command overrides the `recipient` and `amount` inputs, and the
+      amount is treated as human decimal rather than atomic units. The command cannot
+      choose the token: an asset it names must match the `asset` input
+      (case-insensitively) or it is refused, and the `asset` input's spelling is what
+      is recorded. A comment with no `/send` line reports STATUS=skipped and does nothing.
     required: false
   actor_association:
     description: >
