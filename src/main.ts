@@ -126,24 +126,16 @@ async function run(): Promise<number> {
    * Receipts written before this change carry the `inline:` spelling. They are
    * still looked up, but new ones are recorded only under the canonical key.
    *
-   * The same goes for the asset. Before `resolveCommandAsset`, a `/send` that
-   * typed `usdc` was keyed `usdc`; now it is keyed with the workflow's `USDC`.
-   * The typed spelling is still looked up, so a payout made under it is found
-   * rather than paid again.
+   * Receipts keyed with an older casing of the asset (`usdc` before
+   * `resolveCommandAsset` fixed the spelling) need no alias here: the receipt
+   * ledger matches the asset field case-insensitively (`sameKey`).
    */
   const key = keyFor(intent);
   const idempotencyKey = canonical({ ...key, recipient: target.address });
-  const recipientSpellings = [
-    target.address,
-    ...(target.resolvedBy === "inline-address" ? [`${INLINE_PREFIX}${target.address}`] : []),
-  ];
-  const assetSpellings = [
-    intent.asset,
-    ...(command?.asset !== undefined && command.asset !== intent.asset ? [command.asset] : []),
-  ];
-  const legacyKeys = assetSpellings
-    .flatMap((a) => recipientSpellings.map((r) => canonical({ ...key, asset: a, recipient: r })))
-    .filter((k) => k !== idempotencyKey);
+  const legacyKeys =
+    target.resolvedBy === "inline-address"
+      ? [canonical({ ...key, recipient: `${INLINE_PREFIX}${target.address}` })]
+      : [];
 
   console.log("intent:");
   console.log(JSON.stringify(intent, null, 2));

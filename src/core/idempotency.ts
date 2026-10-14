@@ -38,6 +38,30 @@ function field(name: string, value: string, forbidden = /[|\s]/): string {
   return value;
 }
 
+/**
+ * Whether a recorded key names the same payout as `key`, for ledger lookups.
+ *
+ * Exact equality, except that the asset field compares case-insensitively.
+ * Before a `/send` asset was resolved to the workflow's spelling, it was keyed
+ * as typed, so one payout may be on record as `USDC`, `usdc` or `Usdc`. A
+ * lookup that missed those would pay again. Folding case can only merge keys
+ * that differ in asset case alone, which are one token by then — a coarser
+ * match fails toward under-paying, a finer one toward paying twice.
+ *
+ * For matching only. New keys are still written by `canonical()`, unchanged.
+ */
+export function sameKey(recorded: string, key: string): boolean {
+  if (recorded === key) return true;
+  const a = recorded.split("|");
+  const b = key.split("|");
+  // v1 has exactly six fields, and `canonical` refuses `|` inside any of them,
+  // so the asset is always the fifth.
+  if (a.length !== 6 || b.length !== 6) return false;
+  return a.every((field, i) =>
+    i === 4 ? field.toLowerCase() === b[i]!.toLowerCase() : field === b[i],
+  );
+}
+
 export function keyFor(intent: Intent): IdempotencyKey {
   const { source } = intent;
   return {

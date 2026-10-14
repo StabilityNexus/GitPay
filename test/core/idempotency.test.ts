@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { canonical, keyFor } from "../../src/core/idempotency.js";
+import { canonical, keyFor, sameKey } from "../../src/core/idempotency.js";
 import type { IdempotencyKey, Intent } from "../../src/core/types.js";
 
 function intent(overrides: Partial<Intent> = {}): Intent {
@@ -121,4 +121,20 @@ test("gitlab projects map onto the same key shape as github repos", () => {
   );
   assert.equal(key.source.repo, "group/proj");
   assert.ok(canonical(key).startsWith("xops:v1|gitlab:group/proj#mr/7|"));
+});
+
+test("sameKey folds the asset's case and nothing else", () => {
+  const base = "xops:v1|github:acme/widgets#refs/pull/42|0xdead|eip155:11155111|";
+  assert.ok(sameKey(`${base}USDC|0`, `${base}USDC|0`));
+  assert.ok(sameKey(`${base}Usdc|0`, `${base}usdc|0`), "an old casing is the same payout");
+  assert.ok(!sameKey(`${base}DAI|0`, `${base}USDC|0`), "a different asset is not");
+  assert.ok(!sameKey(`${base}USDC|1`, `${base}USDC|0`), "round still separates payouts");
+  assert.ok(
+    !sameKey(
+      "xops:v1|github:acme/widgets#refs/pull/42|0xdead|eip155:1|USDC|0",
+      `${base}USDC|0`,
+    ),
+    "the network is still compared exactly",
+  );
+  assert.ok(!sameKey("not-a-key", `${base}USDC|0`));
 });

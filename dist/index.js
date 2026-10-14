@@ -142,7 +142,80 @@ function writeOutputs(values) {
         (0,external_node_fs_namespaceObject.appendFileSync)(file, block, "utf8");
 }
 
+;// CONCATENATED MODULE: ./src/core/idempotency.ts
+/**
+ * Returns a canonical string. No hashing, no rail primitives — a driver derives
+ * its rail's replay token from this string.
+ *
+ * `amount` is excluded on purpose: with amount in the key, `/send alice 50`
+ * corrected to `/send alice 500` yields two keys and Alice receives 550.
+ * Excluded, the correction collides and requires an explicit `round` bump.
+ *
+ * The string must be injective, so a field may not contain the delimiter that
+ * ends it. Otherwise `ref = "R|A|N"` beside `asset = "X"` spells the same key
+ * as `ref = "R"` beside `asset = "B|N|X"`, and one payout's receipt would
+ * silently block another. Whitespace is refused too: the receipt marker is
+ * whitespace-separated, so a key containing a space could never find its own
+ * receipt, and the payout could be made twice.
+ */
+function canonical(k) {
+    const repo = field("repo", k.source.repo, /[|#\s]/);
+    const ref = field("ref", k.source.ref);
+    const recipient = field("recipient", k.recipient).toLowerCase();
+    const network = field("network", k.network);
+    const asset = field("asset", k.asset);
+    // `xops:` predates the rename to GitPay and stays. Receipts already on PRs
+    // carry keys with this prefix, and a new prefix would never match them.
+    return (`xops:v${k.v}|${k.source.platform}:${repo}#${ref}` +
+        `|${recipient}|${network}|${asset}|${k.round}`);
+}
+function field(name, value, forbidden = /[|\s]/) {
+    if (forbidden.test(value)) {
+        throw new Error(`Idempotency key field ${name} contains a delimiter or whitespace, got "${value}"`);
+    }
+    return value;
+}
+/**
+ * Whether a recorded key names the same payout as `key`, for ledger lookups.
+ *
+ * Exact equality, except that the asset field compares case-insensitively.
+ * Before a `/send` asset was resolved to the workflow's spelling, it was keyed
+ * as typed, so one payout may be on record as `USDC`, `usdc` or `Usdc`. A
+ * lookup that missed those would pay again. Folding case can only merge keys
+ * that differ in asset case alone, which are one token by then — a coarser
+ * match fails toward under-paying, a finer one toward paying twice.
+ *
+ * For matching only. New keys are still written by `canonical()`, unchanged.
+ */
+function sameKey(recorded, key) {
+    if (recorded === key)
+        return true;
+    const a = recorded.split("|");
+    const b = key.split("|");
+    // v1 has exactly six fields, and `canonical` refuses `|` inside any of them,
+    // so the asset is always the fifth.
+    if (a.length !== 6 || b.length !== 6)
+        return false;
+    return a.every((field, i) => i === 4 ? field.toLowerCase() === b[i].toLowerCase() : field === b[i]);
+}
+function keyFor(intent) {
+    const { source } = intent;
+    return {
+        v: 1,
+        source: {
+            platform: source.platform,
+            repo: source.platform === "github" ? source.repo : source.project,
+            ref: source.ref,
+        },
+        recipient: intent.recipient,
+        asset: intent.asset,
+        network: intent.network,
+        round: intent.round,
+    };
+}
+
 ;// CONCATENATED MODULE: ./src/adapters/github/receipts.ts
+
 /**
  * The PR conversation is the ledger.
  *
@@ -269,7 +342,7 @@ function findReceipt(comments, key) {
     for (const comment of comments) {
         const body = comment.body ?? "";
         const marker = parseMarker(body);
-        if (marker["key"] !== key)
+        if (marker["key"] === undefined || !sameKey(marker["key"], key))
             continue;
         if (!isTrustedReceiptAuthor(comment))
             continue;
@@ -5179,55 +5252,6 @@ function isSuccessCode(code) {
     return ERRORS[code].success;
 }
 
-;// CONCATENATED MODULE: ./src/core/idempotency.ts
-/**
- * Returns a canonical string. No hashing, no rail primitives — a driver derives
- * its rail's replay token from this string.
- *
- * `amount` is excluded on purpose: with amount in the key, `/send alice 50`
- * corrected to `/send alice 500` yields two keys and Alice receives 550.
- * Excluded, the correction collides and requires an explicit `round` bump.
- *
- * The string must be injective, so a field may not contain the delimiter that
- * ends it. Otherwise `ref = "R|A|N"` beside `asset = "X"` spells the same key
- * as `ref = "R"` beside `asset = "B|N|X"`, and one payout's receipt would
- * silently block another. Whitespace is refused too: the receipt marker is
- * whitespace-separated, so a key containing a space could never find its own
- * receipt, and the payout could be made twice.
- */
-function canonical(k) {
-    const repo = field("repo", k.source.repo, /[|#\s]/);
-    const ref = field("ref", k.source.ref);
-    const recipient = field("recipient", k.recipient).toLowerCase();
-    const network = field("network", k.network);
-    const asset = field("asset", k.asset);
-    // `xops:` predates the rename to GitPay and stays. Receipts already on PRs
-    // carry keys with this prefix, and a new prefix would never match them.
-    return (`xops:v${k.v}|${k.source.platform}:${repo}#${ref}` +
-        `|${recipient}|${network}|${asset}|${k.round}`);
-}
-function field(name, value, forbidden = /[|\s]/) {
-    if (forbidden.test(value)) {
-        throw new Error(`Idempotency key field ${name} contains a delimiter or whitespace, got "${value}"`);
-    }
-    return value;
-}
-function keyFor(intent) {
-    const { source } = intent;
-    return {
-        v: 1,
-        source: {
-            platform: source.platform,
-            repo: source.platform === "github" ? source.repo : source.project,
-            ref: source.ref,
-        },
-        recipient: intent.recipient,
-        asset: intent.asset,
-        network: intent.network,
-        round: intent.round,
-    };
-}
-
 ;// CONCATENATED MODULE: ./src/core/intent.ts
 // CAIP-2: namespace:reference. Says nothing about what the namespace means.
 const CAIP2 = /^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$/;
@@ -5740,24 +5764,15 @@ async function run() {
      * Receipts written before this change carry the `inline:` spelling. They are
      * still looked up, but new ones are recorded only under the canonical key.
      *
-     * The same goes for the asset. Before `resolveCommandAsset`, a `/send` that
-     * typed `usdc` was keyed `usdc`; now it is keyed with the workflow's `USDC`.
-     * The typed spelling is still looked up, so a payout made under it is found
-     * rather than paid again.
+     * Receipts keyed with an older casing of the asset (`usdc` before
+     * `resolveCommandAsset` fixed the spelling) need no alias here: the receipt
+     * ledger matches the asset field case-insensitively (`sameKey`).
      */
     const key = keyFor(intent);
     const idempotencyKey = canonical({ ...key, recipient: target.address });
-    const recipientSpellings = [
-        target.address,
-        ...(target.resolvedBy === "inline-address" ? [`${INLINE_PREFIX}${target.address}`] : []),
-    ];
-    const assetSpellings = [
-        intent.asset,
-        ...(command?.asset !== undefined && command.asset !== intent.asset ? [command.asset] : []),
-    ];
-    const legacyKeys = assetSpellings
-        .flatMap((a) => recipientSpellings.map((r) => canonical({ ...key, asset: a, recipient: r })))
-        .filter((k) => k !== idempotencyKey);
+    const legacyKeys = target.resolvedBy === "inline-address"
+        ? [canonical({ ...key, recipient: `${INLINE_PREFIX}${target.address}` })]
+        : [];
     console.log("intent:");
     console.log(JSON.stringify(intent, null, 2));
     console.log("payout target:");
