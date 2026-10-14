@@ -8,7 +8,7 @@
   "properties": {
     "comment": {
       "type": "string",
-      "description": "A PR comment body to read a `/send <recipient> <amount> [asset]` command from. Overrides `recipient`, `amount` and `asset`."
+      "description": "A PR comment body to read a `/send <recipient> <amount> [asset]` command from. Overrides `recipient` and `amount`. A named asset must match `asset` (case-insensitive) or the command is refused."
     },
     "actor_association": {
       "type": "string",

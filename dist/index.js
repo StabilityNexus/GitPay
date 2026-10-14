@@ -142,7 +142,80 @@ function writeOutputs(values) {
         (0,external_node_fs_namespaceObject.appendFileSync)(file, block, "utf8");
 }
 
+;// CONCATENATED MODULE: ./src/core/idempotency.ts
+/**
+ * Returns a canonical string. No hashing, no rail primitives — a driver derives
+ * its rail's replay token from this string.
+ *
+ * `amount` is excluded on purpose: with amount in the key, `/send alice 50`
+ * corrected to `/send alice 500` yields two keys and Alice receives 550.
+ * Excluded, the correction collides and requires an explicit `round` bump.
+ *
+ * The string must be injective, so a field may not contain the delimiter that
+ * ends it. Otherwise `ref = "R|A|N"` beside `asset = "X"` spells the same key
+ * as `ref = "R"` beside `asset = "B|N|X"`, and one payout's receipt would
+ * silently block another. Whitespace is refused too: the receipt marker is
+ * whitespace-separated, so a key containing a space could never find its own
+ * receipt, and the payout could be made twice.
+ */
+function canonical(k) {
+    const repo = field("repo", k.source.repo, /[|#\s]/);
+    const ref = field("ref", k.source.ref);
+    const recipient = field("recipient", k.recipient).toLowerCase();
+    const network = field("network", k.network);
+    const asset = field("asset", k.asset);
+    // `xops:` predates the rename to GitPay and stays. Receipts already on PRs
+    // carry keys with this prefix, and a new prefix would never match them.
+    return (`xops:v${k.v}|${k.source.platform}:${repo}#${ref}` +
+        `|${recipient}|${network}|${asset}|${k.round}`);
+}
+function field(name, value, forbidden = /[|\s]/) {
+    if (forbidden.test(value)) {
+        throw new Error(`Idempotency key field ${name} contains a delimiter or whitespace, got "${value}"`);
+    }
+    return value;
+}
+/**
+ * Whether a recorded key names the same payout as `key`, for ledger lookups.
+ *
+ * Exact equality, except that the asset field compares case-insensitively.
+ * Before a `/send` asset was resolved to the workflow's spelling, it was keyed
+ * as typed, so one payout may be on record as `USDC`, `usdc` or `Usdc`. A
+ * lookup that missed those would pay again. Folding case can only merge keys
+ * that differ in asset case alone, which are one token by then — a coarser
+ * match fails toward under-paying, a finer one toward paying twice.
+ *
+ * For matching only. New keys are still written by `canonical()`, unchanged.
+ */
+function sameKey(recorded, key) {
+    if (recorded === key)
+        return true;
+    const a = recorded.split("|");
+    const b = key.split("|");
+    // v1 has exactly six fields, and `canonical` refuses `|` inside any of them,
+    // so the asset is always the fifth.
+    if (a.length !== 6 || b.length !== 6)
+        return false;
+    return a.every((field, i) => i === 4 ? field.toLowerCase() === b[i].toLowerCase() : field === b[i]);
+}
+function keyFor(intent) {
+    const { source } = intent;
+    return {
+        v: 1,
+        source: {
+            platform: source.platform,
+            repo: source.platform === "github" ? source.repo : source.project,
+            ref: source.ref,
+        },
+        recipient: intent.recipient,
+        asset: intent.asset,
+        network: intent.network,
+        round: intent.round,
+    };
+}
+
 ;// CONCATENATED MODULE: ./src/adapters/github/receipts.ts
+
 /**
  * The PR conversation is the ledger.
  *
@@ -269,7 +342,7 @@ function findReceipt(comments, key) {
     for (const comment of comments) {
         const body = comment.body ?? "";
         const marker = parseMarker(body);
-        if (marker["key"] !== key)
+        if (marker["key"] === undefined || !sameKey(marker["key"], key))
             continue;
         if (!isTrustedReceiptAuthor(comment))
             continue;
@@ -4882,6 +4955,37 @@ function parseSendCommand(body) {
     return undefined;
 }
 /**
+ * Reconciles the asset a `/send` names with the one the workflow pays in, and
+ * returns the workflow's spelling.
+ *
+ * A `/send` cannot choose the token: the driver always pays the workflow's
+ * `token` input. So an asset word that disagrees with the workflow is refused
+ * rather than recorded — `/send 0xabc 25 DAI` on a USDC workflow would
+ * otherwise pay 25 USDC under a receipt that says DAI.
+ *
+ * The workflow's spelling, not the typed one, is what reaches the idempotency
+ * key. `asset` is a key field, so `USDC`, `usdc` and `Usdc` kept as typed would
+ * be three keys for one payout, and the same person could be paid three times
+ * on one PR with no `round` bump. Matching is case-insensitive for that reason:
+ * the symbol is a label for the configured token, never a second token.
+ *
+ * A named asset with no configured one is refused too, because there is then
+ * nothing to check it against.
+ */
+function resolveCommandAsset(named, configured) {
+    if (named === undefined)
+        return configured;
+    if (configured === undefined) {
+        throw new Error(`\`/send\` names "${named}", but this workflow sets no \`asset\` input to check it ` +
+            "against. Set `asset` to the symbol of the `token` the workflow pays in.");
+    }
+    if (named.toLowerCase() !== configured.toLowerCase()) {
+        throw new Error(`\`/send\` names "${named}", but this workflow pays in ${configured}. A \`/send\` ` +
+            `cannot choose the token. Name ${configured}, or leave the asset out. ${USAGE}`);
+    }
+    return configured;
+}
+/**
  * Author associations GitHub reports for people who can be trusted to spend the
  * project's money. Everything else — CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR, NONE —
  * is denied by default, so a drive-by commenter cannot trigger a payout to
@@ -5146,55 +5250,6 @@ function isErrorCode(value) {
 /** I8 lives here: one code in the taxonomy is a success. */
 function isSuccessCode(code) {
     return ERRORS[code].success;
-}
-
-;// CONCATENATED MODULE: ./src/core/idempotency.ts
-/**
- * Returns a canonical string. No hashing, no rail primitives — a driver derives
- * its rail's replay token from this string.
- *
- * `amount` is excluded on purpose: with amount in the key, `/send alice 50`
- * corrected to `/send alice 500` yields two keys and Alice receives 550.
- * Excluded, the correction collides and requires an explicit `round` bump.
- *
- * The string must be injective, so a field may not contain the delimiter that
- * ends it. Otherwise `ref = "R|A|N"` beside `asset = "X"` spells the same key
- * as `ref = "R"` beside `asset = "B|N|X"`, and one payout's receipt would
- * silently block another. Whitespace is refused too: the receipt marker is
- * whitespace-separated, so a key containing a space could never find its own
- * receipt, and the payout could be made twice.
- */
-function canonical(k) {
-    const repo = field("repo", k.source.repo, /[|#\s]/);
-    const ref = field("ref", k.source.ref);
-    const recipient = field("recipient", k.recipient).toLowerCase();
-    const network = field("network", k.network);
-    const asset = field("asset", k.asset);
-    // `xops:` predates the rename to GitPay and stays. Receipts already on PRs
-    // carry keys with this prefix, and a new prefix would never match them.
-    return (`xops:v${k.v}|${k.source.platform}:${repo}#${ref}` +
-        `|${recipient}|${network}|${asset}|${k.round}`);
-}
-function field(name, value, forbidden = /[|\s]/) {
-    if (forbidden.test(value)) {
-        throw new Error(`Idempotency key field ${name} contains a delimiter or whitespace, got "${value}"`);
-    }
-    return value;
-}
-function keyFor(intent) {
-    const { source } = intent;
-    return {
-        v: 1,
-        source: {
-            platform: source.platform,
-            repo: source.platform === "github" ? source.repo : source.project,
-            ref: source.ref,
-        },
-        recipient: intent.recipient,
-        asset: intent.asset,
-        network: intent.network,
-        round: intent.round,
-    };
 }
 
 ;// CONCATENATED MODULE: ./src/core/intent.ts
@@ -5649,6 +5704,11 @@ async function run() {
      */
     const requestedNetwork = readInput("network");
     const network = requestedNetwork === undefined ? undefined : canonicalNetwork(requestedNetwork);
+    // A `/send` may name the asset only to confirm it; the workflow's `token` is
+    // what pays, and the workflow's spelling is what reaches the key.
+    const asset = command
+        ? resolveCommandAsset(command.asset, readInput("asset"))
+        : readInput("asset");
     const intent = parseIntent({
         platform: "github",
         repo: readInput("repo") ?? process.env["GITHUB_REPOSITORY"],
@@ -5656,7 +5716,7 @@ async function run() {
         actor: readInput("actor") ?? process.env["GITHUB_ACTOR"],
         recipient: command?.recipient ?? readInput("recipient"),
         amount: command ? toAtomic(command.amount, decimals) : readInput("amount"),
-        asset: command?.asset ?? readInput("asset"),
+        asset,
         network,
         scheme: readInput("scheme"),
         round: readInput("round"),
@@ -5703,6 +5763,10 @@ async function run() {
      *
      * Receipts written before this change carry the `inline:` spelling. They are
      * still looked up, but new ones are recorded only under the canonical key.
+     *
+     * Receipts keyed with an older casing of the asset (`usdc` before
+     * `resolveCommandAsset` fixed the spelling) need no alias here: the receipt
+     * ledger matches the asset field case-insensitively (`sameKey`).
      */
     const key = keyFor(intent);
     const idempotencyKey = canonical({ ...key, recipient: target.address });

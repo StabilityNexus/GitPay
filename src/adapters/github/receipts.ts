@@ -1,3 +1,4 @@
+import { sameKey } from "../../core/idempotency.js";
 import type { LedgerEntry, PayoutContext, SettlementLedger } from "../../core/ledger.js";
 
 /**
@@ -149,7 +150,7 @@ export function findReceipt(comments: readonly CommentLike[], key: string): Rece
   for (const comment of comments) {
     const body = comment.body ?? "";
     const marker = parseMarker(body);
-    if (marker["key"] !== key) continue;
+    if (marker["key"] === undefined || !sameKey(marker["key"], key)) continue;
     if (!isTrustedReceiptAuthor(comment)) continue;
 
     const transaction = marker["tx"] ?? LEGACY_TRANSACTION.exec(body)?.[1];

@@ -6,8 +6,10 @@ import {
   isMaintainer,
   parseAssociations,
   parseSendCommand,
+  resolveCommandAsset,
 } from "../../../src/adapters/github/trigger.js";
 import { toAtomic } from "../../../src/core/amount.js";
+import { canonical } from "../../../src/core/idempotency.js";
 
 const ADDR = "0x000000000000000000000000000000000000dEaD";
 
@@ -48,6 +50,42 @@ test("refuses a command it cannot read rather than guessing", () => {
   assert.throws(() => parseSendCommand(`/send ${ADDR} ten`), /not a valid amount/);
   assert.throws(() => parseSendCommand(`/send ${ADDR} 10 USDC extra`), /at most 3/);
   assert.throws(() => parseSendCommand(`/send ${ADDR} 10usdc USDC`), /asset was given twice/);
+});
+
+test("a /send with no asset pays in the workflow's asset", () => {
+  assert.equal(resolveCommandAsset(undefined, "USDC"), "USDC");
+  assert.equal(resolveCommandAsset(undefined, undefined), undefined);
+});
+
+test("a /send naming the workflow's asset in any case gets the workflow's spelling", () => {
+  for (const typed of ["USDC", "usdc", "Usdc"]) {
+    assert.equal(resolveCommandAsset(typed, "USDC"), "USDC");
+  }
+});
+
+test("a /send cannot choose a different token than the workflow pays in", () => {
+  // The driver pays the `token` input whatever the comment says, so a mismatch
+  // would pay USDC under a receipt that says DAI.
+  assert.throws(() => resolveCommandAsset("DAI", "USDC"), /pays in USDC/);
+  assert.throws(() => resolveCommandAsset("USDT", "USDC"), /cannot choose the token/);
+});
+
+test("a named asset with nothing configured to check it against is refused", () => {
+  assert.throws(() => resolveCommandAsset("USDC", undefined), /sets no `asset` input/);
+});
+
+test("spelling the asset differently cannot produce a second key for one payout", () => {
+  const keyWith = (typed: string | undefined) =>
+    canonical({
+      v: 1,
+      source: { platform: "github", repo: "acme/widgets", ref: "refs/pull/42" },
+      recipient: ADDR,
+      network: "eip155:11155111",
+      asset: resolveCommandAsset(typed, "USDC")!,
+      round: 0,
+    });
+  const keys = new Set([keyWith(undefined), keyWith("USDC"), keyWith("usdc"), keyWith("Usdc")]);
+  assert.equal(keys.size, 1, "every spelling of the one configured asset must share one key");
 });
 
 test("by default maintainers may send and nobody else may", () => {

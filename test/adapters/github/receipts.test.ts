@@ -135,3 +135,14 @@ test("anything not explicitly settled is treated as in-flight", () => {
 test("an empty or bodyless comment is skipped rather than throwing", () => {
   assert.equal(findReceipt([{ body: null }, { body: undefined }, {}], KEY), undefined);
 });
+
+test("an old receipt in one asset casing is found by a retry in another", () => {
+  // Before the asset was resolved to the workflow's spelling it was keyed as
+  // typed. A payout recorded as `Usdc` must block a retry keyed `USDC`, or the
+  // same person is paid twice.
+  const old = KEY.replace("|USDC|", "|Usdc|");
+  const comments = [{ body: formatReceipt({ key: old, status: "settled", transaction: "0xabc" }), ...BOT }];
+  assert.equal(findReceipt(comments, KEY)?.transaction, "0xabc");
+  assert.equal(findReceipt(comments, KEY.replace("|USDC|", "|usdc|"))?.transaction, "0xabc");
+  assert.equal(findReceipt(comments, KEY.replace("|USDC|", "|DAI|")), undefined, "another asset is another payout");
+});
