@@ -1,0 +1,6 @@
+# Exact historical findings to ignore. Each line is one fingerprint: commit:file:rule:line.
+# Commit 155966f used a made-up throwaway signing key in tx.test.ts; it was never a real key,
+# and the test now uses the allowlisted Anvil key. The commit stays in history, so the daily
+# full-history scan would flag it forever. Ignoring this one fingerprint, not the value,
+# means the same key committed anywhere new is still caught.
+155966f3f382816c17da9b379106c58c71e73516:test/drivers/safe-allowance/tx.test.ts:generic-api-key:51

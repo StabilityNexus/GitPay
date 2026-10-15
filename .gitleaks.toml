@@ -1,11 +1,16 @@
 # Default gitleaks rules, plus an allowlist of exact values that are public by
 # design. It lists values, never paths, so a real key committed next to these
 # in a test is still caught.
+#
+# `[allowlist]` (singular) on purpose. gitleaks-action installs gitleaks 8.24.x,
+# which silently ignores the `[[allowlists]]` array form (added in 8.25) — that
+# is why the daily full-history scan failed on these same values. The singular
+# table works on 8.24 and is still accepted by later versions.
 
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Known-public test values used by golden vectors and driver tests"
 regexTarget = "secret"
 regexes = [
