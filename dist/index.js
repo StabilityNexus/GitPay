@@ -5442,13 +5442,24 @@ function format(decision) {
  * be typed.
  */
 const CHAINS = {
+    "eip155:1": {
+        name: "Ethereum",
+        network: "eip155:1",
+        chainId: 1n,
+        explorer: "https://etherscan.io",
+        // v0.1.0, verified 2026-10-15: listed for chain 1 in safe-modules-deployments,
+        // and the code at this address is byte-identical to Sepolia's, the
+        // deployment every live settlement so far ran against. REAL MONEY: see
+        // docs/VERIFIED_CHAINS.md for what has been proven here before relying on it.
+        allowanceModule: "0xCFbFaC74C26F8647cBDb8c5caf80BB5b32E43134",
+    },
     "eip155:11155111": {
         name: "Ethereum Sepolia",
         network: "eip155:11155111",
         chainId: 11155111n,
         explorer: "https://sepolia.etherscan.io",
-        // v0.1.0, verified. Absent from Base Sepolia entirely, which is why this is
-        // the only supported network until v1.0.0 — see DECISION-LOG.md §4 and §6c.
+        // v0.1.0, verified. Absent from Base Sepolia entirely, which is why this was
+        // the only network through v1.0.0 — see DECISION-LOG.md §4 and §6c.
         allowanceModule: "0xCFbFaC74C26F8647cBDb8c5caf80BB5b32E43134",
     },
 };
@@ -5463,6 +5474,10 @@ const CHAINS = {
  * `network: sepolia`.
  */
 const ALIASES = {
+    // Deliberately not `ethereum`: one word that means mainnet to some readers and
+    // "any Ethereum network" to others is a bad name for real money.
+    mainnet: "eip155:1",
+    "ethereum-mainnet": "eip155:1",
     sepolia: "eip155:11155111",
     "ethereum-sepolia": "eip155:11155111",
 };

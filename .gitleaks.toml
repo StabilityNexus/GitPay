@@ -20,4 +20,7 @@ regexes = [
   # Circle's USDC token contract on Ethereum Sepolia. A contract address, not a
   # secret; flagged only because the field holding it is named `token`.
   '''(?i)^(0x)?1c7d4b196cb0c7b01d743fbc6116a902379c7238$''',
+  # Circle's USDC token contract on Ethereum mainnet, per Circle's published
+  # contract list. Same reason as above: public, flagged for its field name.
+  '''(?i)^(0x)?a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48$''',
 ]

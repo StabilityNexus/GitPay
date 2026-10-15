@@ -67,3 +67,29 @@ payouts on this page (20 here plus the merged-PR payout). The four replays moved
 Before the move to GitPay, [demo-XOps#1](https://github.com/kpj2006/demo-XOps/pull/1) settled
 three payouts on the pre-rename implementation, and a replay there reported `already-paid`. See
 the release gate in `REFERENCES.md` §2.4.
+
+## Ethereum mainnet (`eip155:1`) — registered, NOT yet verified
+
+**Not supported until the live rows below are filled.** The constants are verified and the
+network is in the registry, so `network: mainnet` derives `chain_id`, `allowance_module` and
+`explorer_url`. Nothing here yet shows a real payout settling. This is real money.
+
+| | |
+|---|---|
+| AllowanceModule | `0xCFbFaC74C26F8647cBDb8c5caf80BB5b32E43134` (Safe canonical, v0.1.0) |
+| Token checked | Circle USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (6 decimals) |
+
+`REFERENCES.md` §2.6, step by step:
+
+| Step | Status | Evidence |
+|---|---|---|
+| 1. Module deployment | ✅ 2026-10-15 | Listed for chain `1` in [`safe-modules-deployments` v0.1.0](https://github.com/safe-global/safe-modules-deployments/blob/main/src/assets/allowance-module/v0.1.0/allowance-module.json). `eth_getCode` at the address returns 15,003 bytes whose SHA-256 matches the Sepolia deployment's exactly. |
+| 2. Token | ✅ 2026-10-15 | `decimals()` = 6, `symbol()` = `USDC`, `name()` = `USD Coin` on-chain; address matches [Circle's published list](https://developers.circle.com/stablecoins/usdc-contract-addresses). The registry still stores no token: `token` and `decimals` stay workflow inputs. |
+| 3. `chains.ts` entry | ✅ | `eip155:1`, aliases `mainnet` and `ethereum-mainnet`. |
+| 4. Boundary diff | ✅ | No change under `src/core` or `src/adapters`. |
+| 5. Calldata | ✅ | Selector `0x4515641a`, 292 bytes, Safe, token, recipient and amount correct in the decoded words. |
+| 6. Smallest settlement | ⏳ | Below $1, then confirm the Safe's balance moved by exactly that amount. |
+| 7. Replay | ⏳ | Identical inputs → `already-paid` with the original transaction, from the PR receipt. |
+| 8. Wrong network | ⏳ | A neighbouring CAIP-2 against the same driver → `DOMAIN_MISMATCH`. |
+| 9. Golden vector | ✅ | `test/vectors/safe-allowance-eip155-1.json`, computed with viem 2.57.1. The same generator reproduces the Sepolia fixture byte-for-byte. |
+| 10. Record the tx hash | ⏳ | Here, once steps 6–8 run. |
