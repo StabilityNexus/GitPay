@@ -142,8 +142,8 @@ export function Hero() {
     <div className="wrap">
       <div className="hero">
         <div className="hero-copy">
-          <a className="announce" href="https://github.com/StabilityNexus/GitPay" target="_blank" rel="noopener">
-            <b>v1.0.0</b> Now live on Ethereum Sepolia <span aria-hidden="true">→</span>
+          <a className="announce" href="https://github.com/StabilityNexus/GitPay/releases/latest" target="_blank" rel="noopener">
+            <b>v1</b> Now live on Ethereum Sepolia <span aria-hidden="true">→</span>
           </a>
           <h1>
             <span className="sr">Pay contributors with one comment.</span>
