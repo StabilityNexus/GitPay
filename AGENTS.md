@@ -23,10 +23,13 @@ The core still speaks the three x402 v2 data shapes — `PaymentRequirements`, `
 later driver may need them. There is no x402 runtime, no facilitator and no EIP-3009 in the
 shipped code. The scheme is `allowance`.
 
-**Ethereum Sepolia (`eip155:11155111`) is the only supported network until v1.0.0 is tagged.**
-Monad, Base (mainnet and Sepolia), Solana, Polygon and everything else are gated behind the
-release criteria in `REFERENCES.md` §2.4. Do not add a second entry to `src/drivers/chains.ts`,
-do not write a second driver, and do not accept a PR that does.
+**Networks are added one at a time, each through `REFERENCES.md` §2.6.** v1.0.0 (tagged
+2026-10-13) closed the §2.4 gate that kept Ethereum Sepolia (`eip155:11155111`) the only network.
+Ethereum mainnet (`eip155:1`) is the second: its constants are verified and registered, and it is
+**supported only once `docs/VERIFIED_CHAINS.md` carries its live evidence** (§2.6 steps 6–10). An
+entry in `src/drivers/chains.ts` is never the claim; the evidence is. Never copy a sibling
+network's entry, never add a network whose AllowanceModule deployment is unverified (Base Sepolia
+has none), and do not write a second driver.
 
 **Why Ethereum Sepolia:** the AllowanceModule is canonically deployed there
 (`0xCFbFaC74C26F8647cBDb8c5caf80BB5b32E43134`, v0.1.0) and is **not deployed on Base Sepolia at
@@ -353,7 +356,10 @@ them, and do not add the networks themselves.
 receipt-comment ledger · inline-address resolver · declared policy · machine-readable receipts
 and outputs.
 
-**Specify, do not build:** any second network (Base mainnet, Monad, Solana, Polygon) ·
+**In progress (post-v1):** Ethereum mainnet, through the §2.6 protocol — registered, pending live
+evidence.
+
+**Specify, do not build:** any further network (Base mainnet, Monad, Solana, Polygon) ·
 x402 `exact` / EIP-3009 driver · `facilitator` and `auto` modes · `auth-capture` (escrow) ·
 `upto` · `batch-settlement` · non-EVM drivers · ERC-8004 resolver · CLI · MCP server ·
 `.well-known/x402.json` discovery · gas auto-refuel · cross-chain or gas-in-USDC
