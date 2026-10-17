@@ -132,6 +132,13 @@ npm run check:boundary
 npm run check:deps
 ```
 
+**Tests are required.** A PR that adds or changes behaviour must add or update tests in `test/`
+that would fail without the change. A bug fix includes a test that reproduces the bug. Anything
+on the payment path (policy, idempotency, the ledger, encoding and signing) needs a test for each
+refusal as well as the success path, and a change to transaction encoding needs its golden vector
+in `test/vectors/` regenerated deliberately with an independent implementation. PRs without tests
+for new behaviour are not merged.
+
 ### 4. Commit Your Changes
 
 Write clear, concise commit messages:
