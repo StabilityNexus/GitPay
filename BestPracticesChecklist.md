@@ -86,8 +86,8 @@
 
 ### Release Notes
 
-- [ ] 🔴 **release_notes** — Each release includes human-readable release notes summarizing major changes. Raw `git log` output is NOT acceptable.
-  - *Evidence URL:* **Unmet.** The [v1.0.0 notes](https://github.com/StabilityNexus/GitPay/releases/tag/v1.0.0) are GitHub's auto-generated list of every merged PR, Dependabot bumps included, with no summary of what changed for adopters. *To fix:* add a short written summary (what's new, what adopters must do) above the generated list, starting with v1.0.1.
+- [x] 🔴 **release_notes** — Each release includes human-readable release notes summarizing major changes. Raw `git log` output is NOT acceptable.
+  - *Evidence URL:* [v1.0.1](https://github.com/StabilityNexus/GitPay/releases/tag/v1.0.1) and [v1.0.0](https://github.com/StabilityNexus/GitPay/releases/tag/v1.0.0) each open with a written summary (what changed, what adopters must do) above the generated PR list. [release-drafter.yml](.github/release-drafter.yml) starts every new draft with a Summary section.
 
 - [~] 🔴 **release_notes_vulns** — Release notes identify every publicly known vulnerability (with CVE) fixed in that release.
   - *Evidence URL:* `[x]` N/A — *Justification:* No release has fixed a publicly known vulnerability in what ships. The Action's runtime dependencies are only `@noble/curves` and `@noble/hashes` (I11). The one security upgrade so far ([#18](https://github.com/StabilityNexus/GitPay/pull/18), `brace-expansion`, `js-yaml`) touched development-only dependencies that are not in `dist/`.
