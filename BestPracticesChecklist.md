@@ -26,12 +26,12 @@
 | Category           | Met | Total | Status |
 |--------------------|-----|-------|--------|
 | Basics             | 8   | 8     | ✅     |
-| Change Control     | 5   | 6     | 🟡     |
+| Change Control     | 6   | 6     | ✅     |
 | Reporting          | 8   | 8     | ✅     |
 | Quality            | 10   | 11     | 🟡     |
 | Security           | 9   | 9     | ✅     |
 | Analysis           | 4   | 7     | 🟡     |
-| **Total**          | **44** | **49** | **90%** |
+| **Total**          | **45** | **49** | **92%** |
 ---
 
 ## 🏗️ Basics
