@@ -60,6 +60,10 @@ const GO_LIVE = (
     <K>cancel-in-progress:</K>
     {" false   "}
     <C># never cancel mid-payout</C>
+    {"\n  "}
+    <K>queue:</K>
+    {" max                  "}
+    <C># keep every waiting /send</C>
     {"\n\n        "}
     <K>with:</K>
     {"\n          "}

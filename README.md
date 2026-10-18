@@ -158,12 +158,18 @@ nothing else.
 
 **Going live.** Create a Safe on Ethereum Sepolia, and in Safe{Wallet} give a delegate address
 a spending limit (Settings → Setup → Spending limits). Then add these inputs, keeping the key and
-the RPC URL in repository secrets, and serialize payouts so two runs never sign at once:
+the RPC URL in repository secrets, and serialize payouts so two runs never sign at once. Put
+`concurrency` on the job, not the workflow, so other PR comments never join the queue, and keep
+`queue: max` so a waiting `/send` is never cancelled by a later one:
 
 ```yaml
-concurrency:
-  group: gitpay-payout-${{ github.repository }}
-  cancel-in-progress: false
+jobs:
+  pay:
+    # …
+    concurrency:
+      group: gitpay-payout-${{ github.repository }}
+      cancel-in-progress: false
+      queue: max
 # …
         with:
           # the three inputs above, plus:
