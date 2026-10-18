@@ -61,6 +61,11 @@ change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&'
 
 template: |
+  ## Summary
+
+  <!-- Before publishing: 2–5 lines on what changed for adopters and what they must do.
+       The PR list below is not release notes on its own (BestPracticesChecklist: release_notes). -->
+
   ## What's Changed
 
   $CHANGES

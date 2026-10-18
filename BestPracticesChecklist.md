@@ -27,11 +27,11 @@
 |--------------------|-----|-------|--------|
 | Basics             | 8   | 8     | ✅     |
 | Change Control     | 5   | 6     | 🟡     |
-| Reporting          | 6   | 8     | 🟡     |
+| Reporting          | 8   | 8     | ✅     |
 | Quality            | 10   | 11     | 🟡     |
 | Security           | 9   | 9     | ✅     |
 | Analysis           | 4   | 7     | 🟡     |
-| **Total**          | **42** | **49** | **86%** |
+| **Total**          | **44** | **49** | **90%** |
 ---
 
 ## 🏗️ Basics
@@ -115,11 +115,11 @@
 
 ### Vulnerability Reporting
 
-- [ ] 🔴 **vulnerability_report_process** — A vulnerability reporting process is documented (e.g., `SECURITY.md`).
-  - *Evidence URL:* **Unmet.** There is no `SECURITY.md` in this repository or in the organization's `.github` repository. *To fix:* add `SECURITY.md` naming how to report privately and what response to expect.
+- [x] 🔴 **vulnerability_report_process** — A vulnerability reporting process is documented (e.g., `SECURITY.md`).
+  - *Evidence URL:* [SECURITY.md](SECURITY.md) — supported versions, how to report, what to include, response times (acknowledge within 7 days, assess within 14), scope.
 
-- [ ] 🟡 **vulnerability_report_private** — If private vulnerability reporting is supported, the method for private submission is documented.
-  - *Evidence URL:* **Unmet.** GitHub private vulnerability reporting is disabled for this repository, and no private channel is documented. *To fix:* a repository admin enables it under Settings → Code security → Private vulnerability reporting, and `SECURITY.md` points to it. For a project that moves money, a private channel matters.
+- [x] 🟡 **vulnerability_report_private** — If private vulnerability reporting is supported, the method for private submission is documented.
+  - *Evidence URL:* [SECURITY.md § Reporting a vulnerability](SECURITY.md#reporting-a-vulnerability) — GitHub private vulnerability reporting ([form](https://github.com/StabilityNexus/GitPay/security/advisories/new)), with a direct message to a listed maintainer as the fallback. Public issues and channels are explicitly ruled out.
 
 - [~] 🔴 **vulnerability_report_response** — Initial response to any vulnerability report received in the last 6 months was within 14 days.
   - *Self-certification note:* `[x]` N/A — *Justification:* no vulnerability reports have been received.

@@ -155,28 +155,63 @@ reviews:
 
   # Custom review instructions for specific file patterns
   path_instructions:
-    # TypeScript/JavaScript files
-    - path: "**/*.{ts,tsx,js,jsx}"
+    # GitPay Action source — AGENTS.md is authoritative; these are its invariants
+    - path: "src/**/*.ts"
       instructions: |
-        TypeScript:
-        - Avoid 'any', use explicit types
-        - Prefer 'import type' for type imports
-        - Review for significant deviations from Google JavaScript style guide. Minor style issues are not a priority
-        - The code adheres to best practices associated with React
-        - The code adheres to best practices associated with React PWA
-        - The code adheres to best practices associated with SPA
-        - The code adheres to best practices recommended by lighthouse or similar tools for performance
-        - The code adheres to best practices associated with Node.js
-        - The code adheres to best practices recommended for performance
+        GitPay is a GitHub Action that pays contributors from the adopter's Safe via the
+        AllowanceModule on Ethereum Sepolia. Read AGENTS.md; flag any change that breaks it.
 
-        Security:
-        - No exposed API keys or sensitive data
-        - Check for common security vulnerabilities such as:
-          - SQL Injection
-          - XSS (Cross-Site Scripting)
-          - CSRF (Cross-Site Request Forgery)
-          - Insecure dependencies
-          - Sensitive data exposure
+        Money-path rules:
+        - Amounts are strings in atomic units. Flag any `number`, float, or `parseFloat` on an amount
+        - The idempotency key (src/core/idempotency.ts) must stay deterministic and must NOT include
+          `amount`, timestamps or comment IDs; the `xops:v1` prefix and `xops-receipt` marker must
+          not be renamed (I7)
+        - `AUTH_ALREADY_USED` is a success, never a failure (I8)
+        - The ledger receipt must be written with status=broadcasting BEFORE broadcast; flag any
+          reordering. Only bot / OWNER / MEMBER / COLLABORATOR receipts may be trusted
+        - Default mode is `dry-run`; an unknown mode must be refused, not treated as "not dry-run" (I5)
+        - No amount above `max_per_payout` may reach a driver (I10)
+        - Simulate (eth_call + eth_estimateGas) before broadcast; never fall back to a guessed gas limit
+        - Refuse, never queue, when the delegate already has a transaction pending
+        - Errors surface as codes from src/core/errors.ts, never stack traces in PR comments
+        - Every settlement path, including failures, writes STATUS, TX_HASH and EXPLORER_URL outputs
+        - The delegate key must never appear in logs, outputs, comments or error messages
+
+        Types: avoid `any`; prefer `import type`. Policy conditions are named constants, never an
+        expression language.
+
+    # The layer boundary (THE ONE RULE, I1/I4/I6)
+    - path: "src/{core,adapters,resolvers}/**/*.ts"
+      instructions: |
+        These layers must stay chain-agnostic. Flag as a blocking issue any import of a chain
+        library (ethers, viem, @noble/*), a token or contract address, an RPC URL, a hash function
+        (keccak256), ABI encoding, or a branch on a specific network (`if (network === ...)`).
+        Core must never read fields inside `PaymentPayload.payload`. `Intent.recipient` stays an
+        opaque `string`, never `0x${string}`. `verify()` and policy evaluation make zero network calls.
+
+    # Drivers — the only layer that knows rails
+    - path: "src/drivers/**/*.ts"
+      instructions: |
+        Flag any second entry in src/drivers/chains.ts or any new driver: Ethereum Sepolia is the
+        only supported network until the release gate in REFERENCES.md §2.4. Network-derived values
+        (chainId, AllowanceModule address, explorer) belong in chains.ts. A driver must declare
+        `nativeReplayProtection`; `safe-allowance` must keep `needsSecret: true` (do not "fix" I3).
+        ABI encoding, RLP and EIP-1559 signing are hand-written on @noble — check them against
+        test/vectors and flag changes to golden vectors without justification.
+
+    # Runtime dependencies (I11, I13)
+    - path: "package.json"
+      instructions: |
+        Runtime `dependencies` must be at most 2 packages, exact-pinned (currently @noble/curves and
+        @noble/hashes). Flag any addition of ethers, viem, thirdweb or @x402/* to runtime deps, and
+        any range specifier (^, ~) on a runtime dependency.
+
+    # Marketing site — not part of the Action
+    - path: "frontend/**/*.{ts,tsx}"
+      instructions: |
+        Static React + Vite marketing site deployed to GitHub Pages; it is not part of the Action.
+        Review for React best practices, accessibility, and performance. It must never import from
+        ../src or handle keys or funds.
 
     # Javascript/Typescript test files
     - path: "**/*.test.{ts,tsx,js,jsx}"
