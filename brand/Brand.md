@@ -5,35 +5,64 @@ CI/CD-native value transfer engine shipped as a versioned GitHub Action. GitPay 
 **Stability Nexus** project, developed within the **AOSSIE** open-source organization.
 
 It covers how GitPay looks and how it is described. What GitPay *is* — its architecture,
-invariants and scope — is defined in [`AGENTS.md`](./AGENTS.md); when this file and
+invariants and scope — is defined in [`AGENTS.md`](../AGENTS.md); when this file and
 `AGENTS.md` disagree about a fact, `AGENTS.md` wins.
 
 ## Visual Identity
 
 ### Logos and Assets
 
-All official logos are stored in the [`/public`](./public) directory.
+Every brand asset lives in this folder, [`/brand`](.). Prefer the SVG; use the PNG only where
+SVG is not accepted.
 
-- **GitPay Logo (light backgrounds):** `/public/GitPay-logo.png` — The primary mark. A git
+```
+brand/
+├── Brand.md                     this file
+├── palette.css                  the palette and type stacks as CSS custom properties
+├── logo/
+│   ├── gitpay-logo.svg          primary mark, light backgrounds   (+ .png, 1254 px)
+│   └── gitpay-logo-dark.svg     primary mark, dark backgrounds    (+ .png, 1254 px)
+└── icons/
+    ├── favicon.svg              simplified glyph, legible at 16 px
+    ├── favicon.ico              16 / 32 / 48 px, for browsers without SVG favicons
+    ├── favicon-16.png  favicon-32.png  favicon-48.png
+    ├── app-icon.svg             full mark on full-bleed Ink, source for the icons below
+    ├── apple-touch-icon.png     180 px
+    └── icon-192.png  icon-512.png   web-app manifest icons
+```
+
+- **GitPay Logo (light backgrounds):** `logo/gitpay-logo.svg` — The primary mark. A git
   branch glyph — two commit nodes joined by a dark stem — whose side branch curves off into a
   blue coin bearing a `$`. It reads as the project in one picture: a repository event branches
   into a payment. The stem is near-black ink (`#161925`).
-- **GitPay Logo (dark backgrounds):** `/public/GitPay-logo-dark.png` — The same mark with the
+- **GitPay Logo (dark backgrounds):** `logo/gitpay-logo-dark.svg` — The same mark with the
   stem in a light neutral (`#E6E9F2`). The blue branch and coin are identical in both versions.
+- **Favicon:** `icons/favicon.svg` — The branch and coin reduced to what survives at 16 px:
+  Mist nodes and stem on an Ink tile, the blue branch and coin, no `$`. The project site
+  serves a copy at `/frontend/public/favicon.svg`.
+- **App icon:** `icons/app-icon.svg` — The dark-variant mark on a square Ink background with
+  no transparency, because iOS and Android apply their own corner mask. The touch and
+  manifest PNGs are rendered from it.
 - **Stability Nexus Logo:** `/public/stability.svg` — Parent project mark. Shown beside the
   GitPay logo in README headers, never as a substitute for it.
 - **AOSSIE Logo:** `/public/aossie-logo.svg` — Organization mark, for cross-org materials.
-- **Favicon:** `/frontend/public/favicon.svg` — A simplified branch-and-coin glyph for the
-  project site, legible at 16 px.
 
 Both logo files have transparent backgrounds. Choose the variant by the background, not by
 taste: in Markdown, switch automatically with a `<picture>` element, as the README header does.
 
 ```html
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/GitPay-logo-dark.png">
-  <img alt="GitPay" src="public/GitPay-logo.png" width="175">
+  <source media="(prefers-color-scheme: dark)" srcset="brand/logo/gitpay-logo-dark.svg">
+  <img alt="GitPay" src="brand/logo/gitpay-logo.svg" width="175">
 </picture>
+```
+
+On a web page, link the icon set like this:
+
+```html
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 ```
 
 Do not recolor the coin, rotate the mark, separate the coin from the branch, or set the logo
@@ -87,9 +116,10 @@ All text pairings must meet WCAG 2.1 AA (4.5:1). On light surfaces use Ink for b
 GitPay Blue for links; on dark surfaces use Mist or white for body text and Sky Blue for
 links. Never convey status by color alone — always pair the color with the status word.
 
-> **Note.** The project site in [`/frontend`](./frontend) currently uses a violet accent
+> **Note.** The project site in [`/frontend`](../frontend) currently uses a violet accent
 > (`#8b6cff` / `#5b3cc4`) that predates the logo. The logo palette above is the brand; the
-> site should move to it when next redesigned.
+> site should move to it when next redesigned. Its favicon already has. The tokens in
+> [`palette.css`](./palette.css) are ready to drop in.
 
 ## Typography
 
