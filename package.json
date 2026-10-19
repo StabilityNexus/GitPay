@@ -30,7 +30,7 @@
     "@types/node": "26.6.5",
     "@vercel/ncc": "0.38.4",
     "eslint": "9.39.0",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "typescript-eslint": "8.71.1"
   }
 }
