@@ -4,3 +4,8 @@
 # full-history scan would flag it forever. Ignoring this one fingerprint, not the value,
 # means the same key committed anywhere new is still caught.
 155966f3f382816c17da9b379106c58c71e73516:test/drivers/safe-allowance/tx.test.ts:generic-api-key:51
+
+# Commit c4e4258 registered Ethereum mainnet and was later reverted (Sepolia only until the
+# release gate). Its test vector names the public mainnet USDC contract as "token", which the
+# generic-api-key rule mistakes for a secret. It is a contract address, not a credential.
+c4e4258d420b7df6451d1bd3e9476897d527e261:test/vectors/safe-allowance-eip155-1.json:generic-api-key:8

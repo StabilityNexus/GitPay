@@ -17,7 +17,6 @@ jobs:
 
   create-matrix:
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'AOSSIE-Org' }}
 
     permissions:
       security-events: write
@@ -52,7 +51,7 @@ jobs:
   analyze:
     needs: create-matrix
 
-    if: ${{ github.repository_owner == 'AOSSIE-Org' && needs.create-matrix.outputs.matrix != '[]' }}
+    if: ${{ needs.create-matrix.outputs.matrix != '[]' }}
 
     name: Analyze (${{ matrix.language }})
 
