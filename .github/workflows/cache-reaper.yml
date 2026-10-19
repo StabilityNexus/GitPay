@@ -17,12 +17,14 @@ on:
         type: string
 
 permissions:
-  actions: write
   contents: read
 
 jobs:
   reap:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write # delete caches
+      contents: read
     steps:
       - name: Delete stale & orphaned caches
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0

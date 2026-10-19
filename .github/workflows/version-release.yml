@@ -8,12 +8,14 @@ on:
       - 'VERSION'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     if: ${{ github.repository_owner == 'AOSSIE-Org' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the tag and create the release
     
     steps:
       - name: Checkout code

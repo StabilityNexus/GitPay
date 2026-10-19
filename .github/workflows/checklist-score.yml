@@ -8,6 +8,9 @@ on:
     - cron: '0 9 * * 1' # Every Monday 9am UTC (for criteria sync)
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
 
   # Runs when BestPracticesChecklist.md changes

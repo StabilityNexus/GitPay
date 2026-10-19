@@ -9,6 +9,9 @@ on:
     - cron: "20 2 * * 1" # weekly scan
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
 
 # --------------------------------------------------
