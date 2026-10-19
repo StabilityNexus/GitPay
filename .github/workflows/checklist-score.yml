@@ -8,6 +8,9 @@ on:
     - cron: '0 9 * * 1' # Every Monday 9am UTC (for criteria sync)
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
 
   # Runs when BestPracticesChecklist.md changes
@@ -17,7 +20,7 @@ jobs:
       contents: write
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -166,7 +169,7 @@ jobs:
       github.repository == 'AOSSIE-Org/Template-Repo' &&
       (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Fetch upstream OpenSSF criteria
         run: |

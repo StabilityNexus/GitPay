@@ -5,6 +5,10 @@ on:
   schedule:
   - cron: "0 0 1 * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   repo-sync:
     runs-on: ubuntu-latest
@@ -17,14 +21,14 @@ jobs:
     steps:
       # Check out the repository
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # https://github.com/actions/checkout#usage
         # uncomment if you use submodules within the repository
         # with:
         #   submodules: true
 
       - name: actions-template-sync
-        uses: AndreasAugustin/actions-template-sync@v2
+        uses: AndreasAugustin/actions-template-sync@6e1d0089686f8940604fc15baae62367bf6ee860 # v2.6.0
         with:
           source_repo_path: AOSSIE-Org/Template-Repo
           upstream_branch: main # defaults to main

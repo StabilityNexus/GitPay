@@ -8,16 +8,18 @@ on:
       - 'VERSION'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     if: ${{ github.repository_owner == 'AOSSIE-Org' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the tag and create the release
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -57,7 +59,7 @@ jobs:
 
       - name: Find and Publish Draft Release
         id: publish_release
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

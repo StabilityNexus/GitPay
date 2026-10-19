@@ -7,24 +7,20 @@ on:
       - "*" # triggers only if push new tag version, like `0.8.4` or else
 
 permissions:
-  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
-  actions: read
-  # Require writing security events to upload SARIF file to security tab
-  security-events: write
-  # to fetch code (actions/checkout)
   contents: read
 
 jobs:
   osv-scan:
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.7.0"
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
     with:
       # Recursive scan supports multiple ecosystems:
       # Go, Node.js, Python, Rust, Java, etc.
       scan-args: |-
         ./
     permissions:
-      # Require writing security events to upload SARIF file to security tab
-      security-events: write
+      actions: read # see github/codeql-action#2117
+      security-events: write # upload SARIF to the security tab
+      contents: read
   tests:
     name: Run unit tests
     runs-on: ubuntu-latest

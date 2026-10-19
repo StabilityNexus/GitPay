@@ -9,16 +9,18 @@ on:
     types: [closed]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   update_release_draft:
     if: ${{ github.repository_owner == 'AOSSIE-Org' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create and update the draft release
+      pull-requests: write # autolabel PRs
     steps:
       - name: Run Release Drafter
-        uses: release-drafter/release-drafter@v7
+        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
         with:
           config-name: release-drafter.yml
           disable-autolabeler: false
