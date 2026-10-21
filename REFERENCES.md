@@ -37,8 +37,10 @@ Node ≥ 20 (native `fetch`, `using: node20` in `action.yml`).
 > that is the only place I1 permits a chain id or a hex address to be written down. `main.ts`
 > does the lookup and hands plain strings down, so core and the adapters still learn nothing.
 
-**Ethereum Sepolia is the only network implemented until v1.0.0.** Everything in §2.3 is
-reference material for later phases — do not add those entries to `chains.json` yet.
+**Ethereum Sepolia was the only network through v1.0.0.** Ethereum mainnet (`eip155:1`) is
+now registered after §2.6 steps 1–5 and 9; it is supported once steps 6–10 are recorded in
+`docs/VERIFIED_CHAINS.md`. Everything else in §2.3 is still reference material — add each only
+through §2.6.
 
 ### 2.1 Ethereum Sepolia — the only active target
 
