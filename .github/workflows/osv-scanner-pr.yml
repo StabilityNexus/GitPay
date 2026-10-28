@@ -9,13 +9,12 @@ on:
     branches: [main]
 
 permissions:
-  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
-  actions: read
-  # Require writing security events to upload SARIF file to security tab
-  security-events: write
-  # Only need to read contents
   contents: read
 
 jobs:
   scan-pr:
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.6.0
+    permissions:
+      actions: read # see github/codeql-action#2117
+      security-events: write # upload SARIF to the security tab
+      contents: read
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0

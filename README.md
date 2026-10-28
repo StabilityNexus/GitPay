@@ -5,8 +5,8 @@
 <div align="center" style="display: flex; align-items: center; justify-content: center; gap: 16px;">
   <img alt="Stability Nexus" src="public/stability.svg" width="175">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="public/GitPay-logo-dark.png">
-    <img alt="GitPay" src="public/GitPay-logo.png" width="175">
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo/gitpay-logo-dark.svg">
+    <img alt="GitPay" src="brand/logo/gitpay-logo.svg" width="175">
   </picture>
 </div>
 
@@ -158,12 +158,18 @@ nothing else.
 
 **Going live.** Create a Safe on Ethereum Sepolia, and in Safe{Wallet} give a delegate address
 a spending limit (Settings → Setup → Spending limits). Then add these inputs, keeping the key and
-the RPC URL in repository secrets, and serialize payouts so two runs never sign at once:
+the RPC URL in repository secrets, and serialize payouts so two runs never sign at once. Put
+`concurrency` on the job, not the workflow, so other PR comments never join the queue, and keep
+`queue: max` so a waiting `/send` is never cancelled by a later one:
 
 ```yaml
-concurrency:
-  group: gitpay-payout-${{ github.repository }}
-  cancel-in-progress: false
+jobs:
+  pay:
+    # …
+    concurrency:
+      group: gitpay-payout-${{ github.repository }}
+      cancel-in-progress: false
+      queue: max
 # …
         with:
           # the three inputs above, plus:
@@ -204,7 +210,13 @@ git clone https://github.com/StabilityNexus/GitPay.git
 cd GitPay
 npm install
 npm run check   # lint + layer-boundary check + dependency-count check + tests
+npm test        # tests only
+npm run build   # bundle src/ into dist/index.js — commit dist/ with your change (CI diffs it)
 ```
+
+To **run** the Action, push a branch that contains a workflow using it (see
+[Using the Action](#using-the-action)); with no `mode` input it runs as a dry run and moves no
+funds. To run the marketing site locally: `cd frontend && npm install && npm run dev`.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contribution workflow and
 [ROADMAP.md](./ROADMAP.md) for what's being built and in what order.

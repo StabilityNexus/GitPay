@@ -47,8 +47,9 @@ test("hex round-trips and rejects malformed input", () => {
   assert.throws(() => hexToBytes("0xzz"), /not hex/);
 });
 
-// A throwaway key. Never used for anything but deriving a deterministic address.
-const KEY = "0x4c0883a69102937d6231471b5dbb6204fe512961708279f1a4b1e1a1a1a1a1a1";
+// Anvil / Hardhat test account #0: public, never funded on a real network, and
+// the one key value .gitleaks.toml allowlists. Only its determinism matters here.
+const KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
 const TX = {
   chainId: 11155111n,

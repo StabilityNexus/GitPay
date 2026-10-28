@@ -280,13 +280,21 @@ GitHub holds the state. Only receipts from bots and OWNER / MEMBER / COLLABORATO
 so a contributor cannot block someone's payout with a forged comment. A failed settlement is not
 recorded, so a genuine retry can still pay.
 
-The lookup is check-then-act, so adopter workflows must serialize payouts:
+The lookup is check-then-act, so adopter workflows must serialize payouts. Set the group on
+the payout **job**, not the workflow, and queue every pending run:
 
 ```yaml
-concurrency:
-  group: gitpay-payout-${{ github.repository }}
-  cancel-in-progress: false   # cancelling mid-settlement loses the receipt
+jobs:
+  pay:
+    concurrency:
+      group: gitpay-payout-${{ github.repository }}
+      cancel-in-progress: false   # cancelling mid-settlement loses the receipt
+      queue: max                  # the default keeps one pending run and cancels the rest
 ```
+
+At workflow level every `issue_comment` run joins the group before the job's `if` filters it,
+and the default `queue: single` keeps only the newest pending run. A plain "lgtm" posted while
+a payout runs would then cancel a `/send` waiting behind it.
 
 The `xops:` prefix and the `xops-receipt` marker predate the rename to GitPay and are kept
 deliberately. Existing receipts carry both. Renaming either would hide every past payout from
@@ -353,8 +361,8 @@ them, and do not add the networks themselves.
   fallback — a failed estimate after a passing simulation is an error, not a reason to guess.
 - **The ledger is written before broadcast.** A broadcast with no record is how a re-run pays
   twice.
-- **Never cancel a payout run in progress.** `cancel-in-progress: false` in every adopter
-  template.
+- **Never cancel a payout run in progress.** `cancel-in-progress: false` and `queue: max`, on
+  the payout job, in every adopter template.
 - **Untrusted comments never mark a payout as paid.** Only bot and maintainer receipts count.
 - Remaining risk, known: a run that dies after the ledger write and before broadcast leaves a
   `broadcasting` receipt for a payout that never happened. That fails toward **under**-paying —

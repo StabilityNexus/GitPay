@@ -1,0 +1,20 @@
+/* GitPay brand tokens. Source of truth: brand/Brand.md. */
+:root {
+  /* Brand — taken from the logo */
+  --gitpay-blue: #0C61EB;      /* primary; links and buttons on light */
+  --gitpay-coin-blue: #0D89F2; /* graphics, icons, focus rings; not body text */
+  --gitpay-sky-blue: #0DABF8;  /* links and emphasis on dark */
+  --gitpay-gradient: linear-gradient(135deg, #0C61EB 0%, #0DABF8 100%);
+  --gitpay-ink: #161925;       /* text on light, dark surfaces */
+  --gitpay-mist: #E6E9F2;      /* borders on light, text on dark */
+
+  /* Payout status — fixed meaning, never decoration */
+  --gitpay-status-settled: #16A34A;      /* settled, AUTH_ALREADY_USED */
+  --gitpay-status-dry-run: #64748B;
+  --gitpay-status-broadcasting: #D97706; /* outcome unknown */
+  --gitpay-status-failed: #DC2626;       /* refused / failed */
+
+  /* Typography */
+  --gitpay-font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --gitpay-font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}

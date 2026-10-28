@@ -9,7 +9,7 @@ We welcome contributions from everyone. By participating in this project, you ag
 **All project communication MUST happen on Discord. We do not pay attention to GitHub notifications.**
 
 - Join our [Discord server](https://discord.gg/hjUhu33uAn) before starting any work
-- Post your PR/issue updates in the relevant Discord channel (**MANDATORY**)
+- GitPay's channel is [#gitpay](https://discord.com/channels/1022871757289422898/1458764598562783323) — post your PR/issue updates there (**MANDATORY**)
 - All discussions, questions, and updates should be on Discord
 - GitHub is for code only - Discord is for communication
 
@@ -132,6 +132,13 @@ npm run check:boundary
 npm run check:deps
 ```
 
+**Tests are required.** A PR that adds or changes behaviour must add or update tests in `test/`
+that would fail without the change. A bug fix includes a test that reproduces the bug. Anything
+on the payment path (policy, idempotency, the ledger, encoding and signing) needs a test for each
+refusal as well as the success path, and a change to transaction encoding needs its golden vector
+in `test/vectors/` regenerated deliberately with an independent implementation. PRs without tests
+for new behaviour are not merged.
+
 ### 4. Commit Your Changes
 
 Write clear, concise commit messages:
@@ -213,7 +220,7 @@ Steps to test the changes
 
 ### After Submission
 
-- Post your PR in the project's Discord channel for visibility(**IMPORTANT**)
+- Post your PR in [GitPay's Discord channel](https://discord.com/channels/1022871757289422898/1458764598562783323) for visibility (**IMPORTANT**)
 - Respond to review comments promptly
 - Make requested changes in new commits
 - Be patient - maintainers will review when available
@@ -499,7 +506,7 @@ If you encounter issues not covered here:
 
 1. Check [pre-commit documentation](https://pre-commit.com/)
 2. Review the error message carefully (it usually tells you what's wrong)
-3. Ask in the project's Discord channel
+3. Ask in [GitPay's Discord channel](https://discord.com/channels/1022871757289422898/1458764598562783323)
 4. Search for similar issues in the repository
 
 **Remember:** Pre-commit hooks are there to help you maintain code quality. Don't fight them - fix the issues they find!
