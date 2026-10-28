@@ -18,15 +18,23 @@ delegate — and after that **does nothing per payout**. CI holds the delegate k
 `executeAllowanceTransfer`; the Safe pays the recipient directly. The single optimization target
 is **"maintainer does less"** (`DECISION-LOG.md` §4–§5).
 
+There is a second, simpler rail for adopters who have no Safe: **`approve`**. The maintainer
+calls `approve(delegate, N)` on the token from an ordinary wallet — MetaMask, Rabby, a hardware
+wallet — and CI calls `transferFrom(wallet, recipient, amount)`. Same delegate-key model, same
+ledger, no Safe. The trade: an ERC-20 allowance does not reset, so the maintainer tops it up by
+hand when it runs out, and a leaked key can spend only what is left of it, once
+(`DECISION-LOG.md` §13). `allowance` stays the default.
+
 The core still speaks the three x402 v2 data shapes — `PaymentRequirements`, `PaymentPayload`,
 `SettlementResponse` — as the vocabulary between layers, because they are rail-neutral and a
 later driver may need them. There is no x402 runtime, no facilitator and no EIP-3009 in the
-shipped code. The scheme is `allowance`.
+shipped code. The schemes are `allowance` (default) and `approve`.
 
 **Ethereum Sepolia (`eip155:11155111`) is the only supported network until v1.0.0 is tagged.**
 Monad, Base (mainnet and Sepolia), Solana, Polygon and everything else are gated behind the
 release criteria in `REFERENCES.md` §2.4. Do not add a second entry to `src/drivers/chains.ts`,
-do not write a second driver, and do not accept a PR that does.
+do not write a driver for another network, and do not accept a PR that does. A second *scheme*
+on the same network (`approve`) is not a second network.
 
 **Why Ethereum Sepolia:** the AllowanceModule is canonically deployed there
 (`0xCFbFaC74C26F8647cBDb8c5caf80BB5b32E43134`, v0.1.0) and is **not deployed on Base Sepolia at
@@ -121,6 +129,7 @@ Three things get conflated. Only one is forbidden.
 | | Who holds funds | Allowed |
 |---|---|---|
 | Direct transfer from the adopter's Safe | the adopter — Safe → recipient in one call | ✅ core |
+| Direct transfer from the adopter's own wallet (`approve`) | the adopter — wallet → recipient in one `transferFrom` | ✅ core |
 | Escrow (`auth-capture`) | a contract **the adopter deployed and controls** | ✅ specified, not built |
 | Pooled / omnibus balance | a service operator's account | ❌ Tier 2 only |
 
@@ -133,8 +142,8 @@ what I3 enforces.
 
 ### The delegate key, stated honestly
 
-The allowance model puts a key in CI **on purpose**. That is why the `safe-allowance` driver
-declares `needsSecret: true` and `main.ts` constructs the registry at **Tier 1** — an
+The allowance model puts a key in CI **on purpose**. That is why the `safe-allowance` and
+`erc20-approve` drivers declare `needsSecret: true` and `main.ts` constructs the registry at **Tier 1** — an
 adopter-operated process with its own credentials. I3 rejecting it at Tier 0 is correct; do not
 "fix" it by flipping the capability.
 
@@ -143,7 +152,11 @@ revocable.** A leaked delegate key can move up to the allowance in every period,
 address, until a Safe owner removes the delegate. The cap resets automatically, so losses are
 **cumulative**: a key that stays authorized across N resets can drain N periods' worth, bounded
 only by the Safe's balance. Size the period cap at what you can afford to lose in one period,
-and revoke the delegate as soon as a leak is suspected — the reset timer is not on your side. Full blast-radius reading: `DECISION-LOG.md` §6a.
+and revoke the delegate as soon as a leak is suspected — the reset timer is not on your side.
+
+Under `approve` the bound is the remaining ERC-20 allowance, and it does not refill: a leaked key
+can spend what is left, once. Revoke with `approve(delegate, 0)`. The driver refuses a delegate
+key that controls the payer itself — that is the payout wallet's own key in CI, unbounded. Full blast-radius reading: `DECISION-LOG.md` §6a.
 
 Registry error message when I3 fires (`src/drivers/registry.ts`):
 
@@ -170,9 +183,10 @@ Do **not** add `ethers`, `viem`, `thirdweb`, or `@x402/*` to runtime dependencie
 the noble packages through Dependabot (I13); a major bump changes import paths and must be done
 by hand with the golden vectors re-checked.
 
-Everything needed is implemented on noble in `src/drivers/safe-allowance/` — ABI encoding of
-`executeAllowanceTransfer`, RLP, EIP-1559 transaction signing over secp256k1, and JSON-RPC over
-native `fetch`.
+Everything needed is implemented on noble in `src/drivers/evm/` — ABI words, RLP, EIP-1559
+transaction signing over secp256k1, JSON-RPC over native `fetch`, and the shared
+nonce-check / simulate / sign / broadcast sequence. Each driver supplies only its calldata:
+`executeAllowanceTransfer` in `safe-allowance/`, `transferFrom` in `erc20-approve/`.
 
 ---
 
@@ -181,7 +195,7 @@ native `fetch`.
 ```
 src/core/           types, intent, policy, idempotency, ledger, amount, defaults, errors   ← I1
 src/resolvers/      identity → PayoutTarget. Ships inline-address; interface for more      ← I1
-src/drivers/        types, registry, chains.ts, safe-allowance/   ← rails live ONLY here
+src/drivers/        types, registry, chains.ts, evm/, safe-allowance/, erc20-approve/   ← rails live ONLY here
 src/adapters/github trigger, inputs, outputs, receipts (the ledger)                        ← I1
 src/main.ts         the Action entry point and the only seam that constructs a driver
 action.yml          inputs; frozen as schema/action-inputs.v1.schema.json
@@ -256,7 +270,9 @@ export function canonical(k: IdempotencyKey): string {
 `msg.sender == delegate`, the module checks caller identity only; the nonce is hashed but never
 compared against a stored value, so an identical second call pays again while the allowance has
 headroom. The driver therefore declares `nativeReplayProtection: false`, and I9 makes a ledger
-mandatory.
+mandatory. `transferFrom` has no nonce at all, so the `approve` driver declares the same. `scheme`
+is deliberately **not** in the key: moving a repo from `allowance` to `approve` must not re-pay
+anything already paid.
 
 **The receipt comment is the ledger** (`src/adapters/github/receipts.ts`). The key is carried in
 an HTML comment, `<!-- xops-receipt:v1 … -->`, exact but invisible when rendered. No server —
@@ -350,6 +366,7 @@ them, and do not add the networks themselves.
 ## Scope
 
 **In (v1.0.0):** **Ethereum Sepolia only** · GitHub adapter · Safe AllowanceModule driver ·
+ERC-20 `approve` driver (after v1.0.0, same network) ·
 receipt-comment ledger · inline-address resolver · declared policy · machine-readable receipts
 and outputs.
 

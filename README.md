@@ -177,6 +177,22 @@ concurrency:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+**Going live without a Safe.** Pay from an ordinary wallet instead: MetaMask, Rabby, or a
+hardware wallet. Create a separate delegate address, then from the wallet holding the USDC call
+`approve(delegate, amount)` on the token contract (Etherscan's *Write as Proxy* tab works). Use
+`scheme: approve` and `payer` in place of `safe`:
+
+```yaml
+          scheme: approve
+          payer: "0xYourWallet"        # the wallet that approved the delegate
+          token: "0xYourToken"
+          delegate_key: ${{ secrets.GITPAY_DELEGATE_KEY }}
+          # rpc_url, pr, github_token, max_per_payout as above
+```
+
+The approval does not reset like a Safe spending limit, so top it up when it runs out. In return,
+a leaked delegate key can spend only what is left of it, once. Revoke with `approve(delegate, 0)`.
+
 [SETTLEMENT-FLOW.md](./SETTLEMENT-FLOW.md) explains what the delegate can and cannot do, and
 [`schema/action-inputs.v1.schema.json`](./schema/action-inputs.v1.schema.json) describes every
 input.

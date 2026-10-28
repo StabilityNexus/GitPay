@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { encodeExecuteAllowanceTransfer } from "../../../src/drivers/safe-allowance/abi.js";
-import { bytesToHex } from "../../../src/drivers/safe-allowance/rlp.js";
+import { bytesToHex } from "../../../src/drivers/evm/rlp.js";
 import {
   addressFromPrivateKey,
   signTransaction,
   signingHash,
-} from "../../../src/drivers/safe-allowance/tx.js";
+} from "../../../src/drivers/evm/tx.js";
 
 /**
  * Golden vectors, computed by an independent implementation (see the fixture's

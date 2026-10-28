@@ -59,9 +59,9 @@
     },
     "scheme": {
       "type": "string",
-      "enum": ["allowance"],
+      "enum": ["allowance", "approve"],
       "default": "allowance",
-      "description": "Settlement scheme. `allowance` settles through Safe's AllowanceModule and is the only one built."
+      "description": "Settlement scheme. `allowance` settles through a Safe's AllowanceModule (needs `safe`). `approve` settles from an ordinary wallet that approved the delegate on the token (needs `payer`)."
     },
     "round": {
       "type": "string",
@@ -105,7 +105,12 @@
     "safe": {
       "type": "string",
       "pattern": "^0x[0-9a-fA-F]{40}$",
-      "description": "Address of the Safe holding the funds. Needed when mode is `self`."
+      "description": "Address of the Safe holding the funds. Needed when mode is `self` and scheme is `allowance`."
+    },
+    "payer": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "Address of the ordinary wallet that approved the delegate on `token`. Needed when mode is `self` and scheme is `approve`."
     },
     "token": {
       "type": "string",
@@ -120,7 +125,7 @@
     "delegate_key": {
       "type": "string",
       "pattern": "^(0x)?[0-9a-fA-F]{64}$",
-      "description": "Private key of the spending-limit delegate. Pass from a secret, never inline. Needed when mode is `self`."
+      "description": "Private key of the delegate: the Safe spending-limit beneficiary, or the address the payer approved. Pass from a secret, never inline. Needed when mode is `self`."
     },
     "explorer_url": {
       "type": "string",

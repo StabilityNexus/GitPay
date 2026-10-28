@@ -11,6 +11,8 @@
 // `amount` and `payment` are uint96, NOT uint256. Assuming uint256 yields a
 // different selector and the call reverts with nothing useful to read.
 
+import { ZERO_ADDRESS, encodeAddress, word } from "../evm/abi.js";
+
 /** Interface types collapse to `address` for selector purposes. */
 export const EXECUTE_ALLOWANCE_TRANSFER_SIGNATURE =
   "executeAllowanceTransfer(address,address,address,uint96,address,uint96,address,bytes)";
@@ -23,23 +25,7 @@ export const EXECUTE_ALLOWANCE_TRANSFER_SIGNATURE =
 export const EXECUTE_ALLOWANCE_TRANSFER_SELECTOR = "0x4515641a";
 
 const UINT96_MAX = (1n << 96n) - 1n;
-const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const HEX_BYTES = /^0x(?:[0-9a-fA-F]{2})*$/;
-
-/** Left-pads to a 32-byte word. Addresses and integers are both right-aligned. */
-function word(hexNoPrefix: string): string {
-  if (hexNoPrefix.length > 64) throw new Error(`value does not fit in a word: ${hexNoPrefix}`);
-  return hexNoPrefix.padStart(64, "0");
-}
-
-export function encodeAddress(value: string): string {
-  if (!HEX_ADDRESS.test(value)) {
-    throw new Error(`not a 20-byte hex address: "${value}"`);
-  }
-  // Lowercased for encoding only. EIP-55 case is a checksum for humans and is
-  // meaningless on the wire; the caller keeps the checksummed form for display.
-  return word(value.slice(2).toLowerCase());
-}
 
 export function encodeUint96(value: string | bigint): string {
   const n = typeof value === "bigint" ? value : BigInt(value);
@@ -87,8 +73,6 @@ export interface AllowanceTransferCall {
    */
   signature?: string;
 }
-
-export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 /** Offset to the `bytes` tail: 8 head words. */
 const BYTES_OFFSET = 8n * 32n;

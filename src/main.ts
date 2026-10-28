@@ -1,7 +1,8 @@
 import { readInput as input } from "./adapters/github/inputs.js";
 import { writeOutputs } from "./adapters/github/outputs.js";
 import { PullRequestReceiptLedger } from "./adapters/github/receipts.js";
-import { SafeAllowanceDriver } from "./drivers/safe-allowance/driver.js";
+import { ERC20_APPROVE_SCHEME, Erc20ApproveDriver } from "./drivers/erc20-approve/driver.js";
+import { SAFE_ALLOWANCE_SCHEME, SafeAllowanceDriver } from "./drivers/safe-allowance/driver.js";
 import {
   isMaintainer,
   parseAssociations,
@@ -17,6 +18,7 @@ import { withAliases } from "./core/ledger.js";
 import { assertAllowed, evaluate, format } from "./core/policy.js";
 import { canonicalNetwork, lookupChain } from "./drivers/chains.js";
 import { DriverRegistry } from "./drivers/registry.js";
+import type { SettlementDriver } from "./drivers/types.js";
 import { INLINE_PREFIX, InlineAddressResolver, ResolverChain } from "./resolvers/index.js";
 
 async function run(): Promise<number> {
@@ -152,7 +154,7 @@ async function run(): Promise<number> {
   if (maxPerPayout === undefined) {
     // Only worth saying on a path that actually moves money.
     console.warn(
-      "no max_per_payout set — the Safe's allowance period cap is the only ceiling on this payout.",
+      "no max_per_payout set — the on-chain allowance is the only ceiling on this payout.",
     );
   }
 
@@ -188,15 +190,46 @@ async function run(): Promise<number> {
     return value;
   };
 
-  const driver = new SafeAllowanceDriver({
+  /**
+   * The scheme picks the driver, and only the chosen one is constructed, so each
+   * asks for its own inputs: `safe` under `allowance`, `payer` under `approve`.
+   * `from` is the account the funds leave, shown on the receipt.
+   */
+  const evm = () => ({
     network: intent.network,
     chainId: BigInt(derived("chain_id", chain?.chainId.toString())),
     rpcUrl: required("rpc_url"),
-    moduleAddress: derived("allowance_module", chain?.allowanceModule),
-    safeAddress: required("safe"),
     tokenAddress: required("token"),
     delegatePrivateKey: required("delegate_key"),
   });
+  const schemes: Record<string, () => { driver: SettlementDriver; from: string; fromLabel: string }> = {
+    [SAFE_ALLOWANCE_SCHEME]: () => {
+      const safeAddress = required("safe");
+      const moduleAddress = derived("allowance_module", chain?.allowanceModule);
+      return {
+        driver: new SafeAllowanceDriver({ ...evm(), safeAddress, moduleAddress }),
+        from: safeAddress,
+        fromLabel: "Safe",
+      };
+    },
+    [ERC20_APPROVE_SCHEME]: () => {
+      const payerAddress = required("payer");
+      return {
+        driver: new Erc20ApproveDriver({ ...evm(), payerAddress }),
+        from: payerAddress,
+        fromLabel: "Wallet",
+      };
+    },
+  };
+
+  const build = schemes[intent.scheme];
+  if (!build) {
+    throw new GitPayError(
+      "DRIVER_NOT_FOUND",
+      `No driver for scheme "${intent.scheme}". Supported: ${Object.keys(schemes).join(", ")}`,
+    );
+  }
+  const { driver, from, fromLabel } = build();
 
   /**
    * Tier 1, not 0: CI holds the delegate key, so this is an adopter-operated
@@ -220,7 +253,8 @@ async function run(): Promise<number> {
       amount: command?.amount ?? intent.amount,
       asset: intent.asset,
       to: target.address,
-      from: input("safe"),
+      from,
+      fromLabel,
       actor: intent.source.actor,
       network: intent.network,
       explorerUrl,
