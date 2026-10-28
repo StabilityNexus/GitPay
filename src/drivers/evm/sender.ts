@@ -101,6 +101,25 @@ export class EvmSender {
       });
     checkResult?.(returned);
 
+    // Empty return data is legitimate from a contract — the AllowanceModule and
+    // no-return ERC-20s both give it — but it is also what any call to an
+    // address with no code returns. A mistyped token or module address would
+    // then mine as a successful no-op and be recorded as a settled payout.
+    if (returned === "0x") {
+      const code = await this.rpc.hex("eth_getCode", [call.to, "latest"]).catch((err: unknown) => {
+        throw Object.assign(
+          new Error(`code lookup failed: ${err instanceof Error ? err.message : String(err)}`),
+          { code: "RPC_UNAVAILABLE" satisfies ErrorCode },
+        );
+      });
+      if (code === "0x") {
+        throw Object.assign(
+          new Error(`no contract code at ${call.to} — check the address and the network`),
+          { code: "SIMULATION_REVERT" satisfies ErrorCode },
+        );
+      }
+    }
+
     // No guessed fallback. The simulation just passed, so a failed estimate is
     // an RPC problem, and a guessed limit that is too low reverts on-chain,
     // burns gas, and leaves a recorded attempt that needs a `round` bump.

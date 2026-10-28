@@ -155,12 +155,33 @@ test("it calls transferFrom(payer, recipient, amount) on the token, from the del
 });
 
 test("a token that returns no data is accepted, as every ERC-20 library accepts it", async () => {
-  fakeRpc({ ...HEALTHY, eth_call: "0x" });
+  fakeRpc({ ...HEALTHY, eth_call: "0x", eth_getCode: "0x6080" });
   const registry = new DriverRegistry(1);
   registry.register(driver());
 
   const response = await registry.settle(PAYLOAD, REQUIREMENTS, { idempotencyKey: "k", ledger: memoryLedger() });
   assert.equal(response.success, true);
+});
+
+test("a token address with no contract code is refused, not recorded as a settled no-op", async () => {
+  // eth_call to an address with no code succeeds with empty data, exactly like
+  // a no-return token. Without this check the transaction mines with status 1
+  // and the ledger says paid while nothing moved.
+  const calls = fakeRpc({ ...HEALTHY, eth_call: "0x", eth_getCode: "0x" });
+  const registry = new DriverRegistry(1);
+  registry.register(driver());
+  const ledger = memoryLedger();
+
+  await assert.rejects(
+    registry.settle(PAYLOAD, REQUIREMENTS, { idempotencyKey: "k", ledger }),
+    (err: Error & { code?: string }) => {
+      assert.equal(err.code, "SIMULATION_REVERT");
+      assert.match(err.message, /no contract code/);
+      return true;
+    },
+  );
+  assert.equal(ledger.entries.size, 0, "nothing recorded, so a corrected run can still pay");
+  assert.ok(!calls.some((c) => c.method === "eth_sendRawTransaction"));
 });
 
 test("a transfer the token refuses by returning false is stopped before anything is recorded", async () => {

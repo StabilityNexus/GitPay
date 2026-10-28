@@ -184,7 +184,8 @@ jobs:
 ```
 
 **Going live without a Safe.** Pay from an ordinary wallet instead: MetaMask, Rabby, or a
-hardware wallet. Create a separate delegate address, then from the wallet holding the USDC call
+hardware wallet. Create a separate delegate address and send it a little Sepolia ETH for gas,
+since it signs every payout. Then, from the wallet holding the USDC, call
 `approve(delegate, amount)` on the token contract (Etherscan's *Write as Proxy* tab works). Use
 `scheme: approve` and `payer` in place of `safe`:
 

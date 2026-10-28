@@ -138,6 +138,8 @@ test("with nothing in flight the same payout proceeds to broadcast", async () =>
     eth_gasPrice: "0x3b9aca00",
     eth_maxPriorityFeePerGas: "0x59682f00",
     eth_call: "0x",
+    // executeAllowanceTransfer returns nothing, so the module's code is checked.
+    eth_getCode: "0x6080",
     eth_estimateGas: "0x186a0",
     eth_sendRawTransaction: "0x",
     eth_getTransactionReceipt: ([hash]: unknown[]) => {

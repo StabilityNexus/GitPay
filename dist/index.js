@@ -4701,6 +4701,18 @@ class EvmSender {
             throw Object.assign(new Error(`simulation reverted: ${err instanceof Error ? err.message : String(err)}`), { code: "SIMULATION_REVERT" });
         });
         checkResult?.(returned);
+        // Empty return data is legitimate from a contract — the AllowanceModule and
+        // no-return ERC-20s both give it — but it is also what any call to an
+        // address with no code returns. A mistyped token or module address would
+        // then mine as a successful no-op and be recorded as a settled payout.
+        if (returned === "0x") {
+            const code = await this.rpc.hex("eth_getCode", [call.to, "latest"]).catch((err) => {
+                throw Object.assign(new Error(`code lookup failed: ${err instanceof Error ? err.message : String(err)}`), { code: "RPC_UNAVAILABLE" });
+            });
+            if (code === "0x") {
+                throw Object.assign(new Error(`no contract code at ${call.to} — check the address and the network`), { code: "SIMULATION_REVERT" });
+            }
+        }
         // No guessed fallback. The simulation just passed, so a failed estimate is
         // an RPC problem, and a guessed limit that is too low reverts on-chain,
         // burns gas, and leaves a recorded attempt that needs a `round` bump.
@@ -6030,7 +6042,8 @@ async function run() {
             };
         },
     };
-    const build = schemes[intent.scheme];
+    // Own keys only: `scheme: constructor` must not find Object.prototype's.
+    const build = Object.hasOwn(schemes, intent.scheme) ? schemes[intent.scheme] : undefined;
     if (!build) {
         throw new GitPayError("DRIVER_NOT_FOUND", `No driver for scheme "${intent.scheme}". Supported: ${Object.keys(schemes).join(", ")}`);
     }

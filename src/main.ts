@@ -222,7 +222,8 @@ async function run(): Promise<number> {
     },
   };
 
-  const build = schemes[intent.scheme];
+  // Own keys only: `scheme: constructor` must not find Object.prototype's.
+  const build = Object.hasOwn(schemes, intent.scheme) ? schemes[intent.scheme] : undefined;
   if (!build) {
     throw new GitPayError(
       "DRIVER_NOT_FOUND",
