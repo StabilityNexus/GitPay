@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { DEFAULT_MAINTAINER_ASSOCIATIONS } from "../src/adapters/github/trigger.js";
 import { DEFAULT_SETTLEMENT_ENABLED, SUPPORTED_SETTLEMENT_MODES } from "../src/core/defaults.js";
 import { canonicalNetwork, lookupChain } from "../src/drivers/chains.js";
+import { ERC20_APPROVE_SCHEME } from "../src/drivers/erc20-approve/driver.js";
 import { SAFE_ALLOWANCE_SCHEME } from "../src/drivers/safe-allowance/driver.js";
 
 /**
@@ -46,9 +47,9 @@ test("the default scheme is one an installed driver actually supports", () => {
   assert.equal(
     scheme,
     SAFE_ALLOWANCE_SCHEME,
-    `action.yml defaults scheme to "${scheme}" but the only driver supports ` +
-      `"${SAFE_ALLOWANCE_SCHEME}". A default with no driver behind it fails every ` +
-      "real settlement with DRIVER_NOT_FOUND while every unit test passes.",
+    `action.yml defaults scheme to "${scheme}", not "${SAFE_ALLOWANCE_SCHEME}". ` +
+      "Changing it silently moves every existing adopter to another rail, and a default " +
+      "with no driver behind it fails every real settlement with DRIVER_NOT_FOUND.",
   );
 });
 
@@ -177,7 +178,7 @@ test("every schema default is action.yml's default, and passes its own schema", 
 
 test("the schema's closed sets are the code's closed sets", () => {
   assert.deepEqual(schema.properties["mode"]?.enum, [...SUPPORTED_SETTLEMENT_MODES]);
-  assert.deepEqual(schema.properties["scheme"]?.enum, [SAFE_ALLOWANCE_SCHEME]);
+  assert.deepEqual(schema.properties["scheme"]?.enum, [SAFE_ALLOWANCE_SCHEME, ERC20_APPROVE_SCHEME]);
 });
 
 test("the schema accepts a real configuration and refuses the mistakes that cost money", () => {
@@ -190,8 +191,12 @@ test("the schema accepts a real configuration and refuses the mistakes that cost
   assert.ok(accepts(p("max_per_payout"), "5"));
   assert.ok(accepts(p("allowed_associations"), "OWNER, MEMBER,COLLABORATOR"));
   assert.ok(accepts(p("safe"), "0x5b7d5882058e001c5502cbf5c2497ec5da54e6e2"));
+  assert.ok(accepts(p("scheme"), "approve"));
+  assert.ok(accepts(p("payer"), "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"));
 
   assert.ok(!accepts(p("mode"), "dryrun"), "a mistyped mode must not validate (I5)");
+  assert.ok(!accepts(p("scheme"), "exact"), "a scheme with no driver must not validate");
+  assert.ok(!accepts(p("payer"), "alice.eth"), "the payer is an address, not a name to resolve");
   assert.ok(!accepts(p("amount"), "2.5"), "amount is atomic units, never a decimal");
   assert.ok(!accepts(p("max_per_payout"), "5 USDC"));
   assert.ok(!accepts(p("enabled"), "no"), "the kill switch takes only true or false");

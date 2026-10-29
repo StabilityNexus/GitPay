@@ -269,8 +269,10 @@ function formatReceipt(receipt, context = {}) {
         ? `**${context.amount} ${context.asset}** → ${receipts_link(explorer, "address", context.to)}`
         : undefined;
     const rows = [];
-    if (context.from)
-        rows.push(["From", `Safe ${receipts_link(explorer, "address", context.from)}`]);
+    if (context.from) {
+        const label = context.fromLabel ? `${context.fromLabel} ` : "";
+        rows.push(["From", `${label}${receipts_link(explorer, "address", context.from)}`]);
+    }
     if (context.actor)
         rows.push(["Authorized by", `@${context.actor}`]);
     if (context.network)
@@ -447,81 +449,7 @@ class PullRequestReceiptLedger {
     }
 }
 
-;// CONCATENATED MODULE: ./src/drivers/safe-allowance/abi.ts
-// ABI encoding for Safe's AllowanceModule. Chain primitives live here and only
-// here — core and adapters may not import this file (I1).
-//
-// Verified signature, read from allowances/contracts/AllowanceModule.sol:
-//
-//   function executeAllowanceTransfer(
-//       ISafe safe, address token, address payable to, uint96 amount,
-//       address paymentToken, uint96 payment, address delegate, bytes signature
-//   ) public
-//
-// `amount` and `payment` are uint96, NOT uint256. Assuming uint256 yields a
-// different selector and the call reverts with nothing useful to read.
-/** Interface types collapse to `address` for selector purposes. */
-const EXECUTE_ALLOWANCE_TRANSFER_SIGNATURE = "executeAllowanceTransfer(address,address,address,uint96,address,uint96,address,bytes)";
-/**
- * keccak256(SIGNATURE)[0..4]. Pinned as a constant so encoding costs no hash,
- * and re-derived in the tests so it can never silently drift from the signature
- * string above.
- */
-const EXECUTE_ALLOWANCE_TRANSFER_SELECTOR = "0x4515641a";
-const UINT96_MAX = (1n << 96n) - 1n;
-const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-const HEX_BYTES = /^0x(?:[0-9a-fA-F]{2})*$/;
-/** Left-pads to a 32-byte word. Addresses and integers are both right-aligned. */
-function word(hexNoPrefix) {
-    if (hexNoPrefix.length > 64)
-        throw new Error(`value does not fit in a word: ${hexNoPrefix}`);
-    return hexNoPrefix.padStart(64, "0");
-}
-function encodeAddress(value) {
-    if (!HEX_ADDRESS.test(value)) {
-        throw new Error(`not a 20-byte hex address: "${value}"`);
-    }
-    // Lowercased for encoding only. EIP-55 case is a checksum for humans and is
-    // meaningless on the wire; the caller keeps the checksummed form for display.
-    return word(value.slice(2).toLowerCase());
-}
-function encodeUint96(value) {
-    const n = typeof value === "bigint" ? value : BigInt(value);
-    if (n < 0n)
-        throw new Error(`uint96 cannot be negative: ${n}`);
-    if (n > UINT96_MAX) {
-        throw new Error(`value ${n} exceeds uint96 max ${UINT96_MAX}`);
-    }
-    return word(n.toString(16));
-}
-/** Dynamic `bytes`: a length word, then the data padded up to a word boundary. */
-function encodeBytesTail(value) {
-    if (!HEX_BYTES.test(value)) {
-        throw new Error(`not an even-length hex byte string: "${value}"`);
-    }
-    const data = value.slice(2).toLowerCase();
-    const byteLength = data.length / 2;
-    const padded = byteLength === 0 ? "" : data.padEnd(Math.ceil(byteLength / 32) * 64, "0");
-    return word(byteLength.toString(16)) + padded;
-}
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-/** Offset to the `bytes` tail: 8 head words. */
-const BYTES_OFFSET = 8n * 32n;
-function encodeExecuteAllowanceTransfer(call) {
-    const head = [
-        encodeAddress(call.safe),
-        encodeAddress(call.token),
-        encodeAddress(call.to),
-        encodeUint96(call.amount),
-        encodeAddress(call.paymentToken ?? ZERO_ADDRESS),
-        encodeUint96(call.payment ?? 0n),
-        encodeAddress(call.delegate),
-        word(BYTES_OFFSET.toString(16)),
-    ].join("");
-    return EXECUTE_ALLOWANCE_TRANSFER_SELECTOR + head + encodeBytesTail(call.signature ?? "0x");
-}
-
-;// CONCATENATED MODULE: ./src/drivers/safe-allowance/rpc.ts
+;// CONCATENATED MODULE: ./src/drivers/evm/rpc.ts
 /**
  * Per request. `fetch` has no timeout of its own, so a stalled endpoint would
  * otherwise hold the job until CI kills it.
@@ -4595,7 +4523,7 @@ const secp256k1_hasher = /* @__PURE__ */ (/* unused pure expression or super */ 
 const hashToCurve = /* @__PURE__ */ (/* unused pure expression or super */ null && ((() => secp256k1_hasher.hashToCurve)()));
 const encodeToCurve = /* @__PURE__ */ (/* unused pure expression or super */ null && ((() => secp256k1_hasher.encodeToCurve)()));
 //# sourceMappingURL=secp256k1.js.map
-;// CONCATENATED MODULE: ./src/drivers/safe-allowance/rlp.ts
+;// CONCATENATED MODULE: ./src/drivers/evm/rlp.ts
 // Minimal RLP, enough to encode an EIP-1559 transaction. Chain primitives live
 // in drivers only (I1).
 /**
@@ -4660,7 +4588,7 @@ function rlpEncode(input) {
     return concat([prefix(payload.length, 0xc0, 0xf7), payload]);
 }
 
-;// CONCATENATED MODULE: ./src/drivers/safe-allowance/tx.ts
+;// CONCATENATED MODULE: ./src/drivers/evm/tx.ts
 
 
 
@@ -4711,87 +4639,35 @@ function addressFromPrivateKey(privateKey) {
     return rlp_bytesToHex(keccak_256(uncompressed).slice(-20));
 }
 
-;// CONCATENATED MODULE: ./src/drivers/safe-allowance/driver.ts
+;// CONCATENATED MODULE: ./src/drivers/evm/sender.ts
 
 
-
-const CAPABILITIES = {
-    offlineVerify: true,
-    needsGas: true,
-    // CI holds the delegate key, so this cannot register in tier 0 (I3).
-    needsSecret: true,
-    // GitPay never holds funds; the Safe pays the recipient directly (I2).
-    custodial: false,
-    /**
-     * Honestly false. On the `msg.sender == delegate` path the module checks
-     * caller identity only — the nonce is consumed as signed-hash input and never
-     * compared against a stored value, so an identical second call transfers
-     * again while the allowance has headroom. I9 therefore requires a ledger.
-     */
-    nativeReplayProtection: false,
-};
-const SAFE_ALLOWANCE_SCHEME = "allowance";
-class SafeAllowanceDriver {
+/**
+ * Signs and broadcasts one contract call from the key CI holds. Every EVM
+ * driver settles this way; what differs between them is only which contract
+ * is called and with what calldata, so that is all a driver supplies.
+ */
+class EvmSender {
     config;
-    id = "safe-allowance/eip155";
-    capabilities = CAPABILITIES;
+    address;
     rpc;
-    delegate;
     constructor(config) {
         this.config = config;
         this.rpc = new JsonRpc(config.rpcUrl);
-        this.delegate = addressFromPrivateKey(config.delegatePrivateKey);
-    }
-    supports(network, scheme) {
-        return network === this.config.network && scheme === SAFE_ALLOWANCE_SCHEME;
-    }
-    buildRequirements(ctx) {
-        return {
-            scheme: SAFE_ALLOWANCE_SCHEME,
-            network: ctx.intent.network,
-            amount: ctx.intent.amount,
-            asset: ctx.intent.asset,
-            payTo: ctx.target.address,
-            maxTimeoutSeconds: 300,
-            extra: { safe: this.config.safeAddress, delegate: this.delegate },
-        };
-    }
-    /**
-     * There is no counterparty signature to check here — the delegate's authority
-     * is the allowance itself, enforced on-chain. Verification is a shape check so
-     * a malformed requirement fails before a transaction is built.
-     */
-    verify(_p, r) {
-        if (r.scheme !== SAFE_ALLOWANCE_SCHEME || r.network !== this.config.network) {
-            return Promise.resolve({ isValid: false, reason: "DOMAIN_MISMATCH" });
-        }
-        if (!/^0x[0-9a-fA-F]{40}$/.test(r.payTo)) {
-            return Promise.resolve({ isValid: false, reason: "RECIPIENT_MISMATCH" });
-        }
-        if (!/^[0-9]+$/.test(r.amount) || BigInt(r.amount) === 0n) {
-            return Promise.resolve({ isValid: false, reason: "AMOUNT_MISMATCH" });
-        }
-        return Promise.resolve({ isValid: true, payer: this.config.safeAddress });
+        this.address = addressFromPrivateKey(config.privateKey);
     }
     /**
      * Signs. Reads chain state — a nonce and a fee estimate — but writes nothing,
      * so no funds can move here. That is the property that lets the caller record
      * the resulting hash before anything becomes irreversible.
+     *
+     * `checkResult` sees the simulated return data and throws to refuse. It
+     * exists for calls that can fail without reverting.
      */
-    async prepare(_p, r) {
-        const data = encodeExecuteAllowanceTransfer({
-            safe: this.config.safeAddress,
-            token: this.config.tokenAddress,
-            to: r.payTo,
-            amount: r.amount,
-            delegate: this.delegate,
-            // msg.sender is the delegate, so no signature is needed. This path has no
-            // replay protection, which is why nativeReplayProtection is false.
-            signature: "0x",
-        });
+    async prepare(call, checkResult) {
         const [pendingHex, latestHex, feeHex, tipHex] = await Promise.all([
-            this.rpc.hex("eth_getTransactionCount", [this.delegate, "pending"]),
-            this.rpc.hex("eth_getTransactionCount", [this.delegate, "latest"]),
+            this.rpc.hex("eth_getTransactionCount", [this.address, "pending"]),
+            this.rpc.hex("eth_getTransactionCount", [this.address, "latest"]),
             this.rpc.hex("eth_gasPrice", []),
             this.rpc.hex("eth_maxPriorityFeePerGas", []).catch(() => toHex(1500000000n)),
         ]);
@@ -4809,7 +4685,7 @@ class SafeAllowanceDriver {
          * silently never gets paid.
          */
         if (pending > latest) {
-            throw Object.assign(new Error(`Delegate ${this.delegate} has ${pending - latest} transaction(s) in flight ` +
+            throw Object.assign(new Error(`Delegate ${this.address} has ${pending - latest} transaction(s) in flight ` +
                 `(nonce ${latest} is unconfirmed). Refusing to queue another payout behind it. ` +
                 "Wait for it to confirm, or replace it from the delegate wallet using nonce " +
                 `${latest} with a higher fee.`), { code: "RPC_UNAVAILABLE" });
@@ -4818,17 +4694,32 @@ class SafeAllowanceDriver {
         const tip = fromHex(tipHex);
         // Simulate first. A revert caught here costs no gas and, crucially, happens
         // before anything is recorded or broadcast.
-        const call = { from: this.delegate, to: this.config.moduleAddress, data };
-        await this.rpc.call("eth_call", [call, "latest"]).catch((err) => {
+        const request = { from: this.address, to: call.to, data: call.data };
+        const returned = await this.rpc
+            .call("eth_call", [request, "latest"])
+            .catch((err) => {
             throw Object.assign(new Error(`simulation reverted: ${err instanceof Error ? err.message : String(err)}`), { code: "SIMULATION_REVERT" });
         });
+        checkResult?.(returned);
+        // Empty return data is legitimate from a contract — the AllowanceModule and
+        // no-return ERC-20s both give it — but it is also what any call to an
+        // address with no code returns. A mistyped token or module address would
+        // then mine as a successful no-op and be recorded as a settled payout.
+        if (returned === "0x") {
+            const code = await this.rpc.hex("eth_getCode", [call.to, "latest"]).catch((err) => {
+                throw Object.assign(new Error(`code lookup failed: ${err instanceof Error ? err.message : String(err)}`), { code: "RPC_UNAVAILABLE" });
+            });
+            if (code === "0x") {
+                throw Object.assign(new Error(`no contract code at ${call.to} — check the address and the network`), { code: "SIMULATION_REVERT" });
+            }
+        }
         // No guessed fallback. The simulation just passed, so a failed estimate is
         // an RPC problem, and a guessed limit that is too low reverts on-chain,
         // burns gas, and leaves a recorded attempt that needs a `round` bump.
         // Nothing is recorded yet, so aborting here costs nothing.
         const gasLimit = this.config.gasLimit ??
             (await this.rpc
-                .hex("eth_estimateGas", [call])
+                .hex("eth_estimateGas", [request])
                 .then((hex) => (fromHex(hex) * 12n) / 10n)
                 .catch((err) => {
                 throw Object.assign(new Error(`gas estimation failed: ${err instanceof Error ? err.message : String(err)}`), { code: "RPC_UNAVAILABLE" });
@@ -4839,11 +4730,11 @@ class SafeAllowanceDriver {
             maxPriorityFeePerGas: tip,
             maxFeePerGas: gasPrice * 2n + tip,
             gasLimit,
-            to: this.config.moduleAddress,
+            to: call.to,
             value: 0n,
-            data,
-        }, this.config.delegatePrivateKey);
-        const raw = { raw: signed.raw, to: r.payTo, amount: r.amount };
+            data: call.data,
+        }, this.config.privateKey);
+        const raw = { raw: signed.raw };
         return { reference: signed.hash, raw };
     }
     /** The irreversible step. Everything before this can be abandoned safely. */
@@ -4909,6 +4800,310 @@ function classify(message) {
     if (/revert/i.test(message))
         return "SIMULATION_REVERT";
     return "RPC_UNAVAILABLE";
+}
+
+;// CONCATENATED MODULE: ./src/drivers/evm/abi.ts
+// ABI words shared by every EVM driver. Chain primitives live under
+// src/drivers/ and only there — core and adapters may not import this file (I1).
+const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const UINT256_MAX = (1n << 256n) - 1n;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+/** Left-pads to a 32-byte word. Addresses and integers are both right-aligned. */
+function word(hexNoPrefix) {
+    if (hexNoPrefix.length > 64)
+        throw new Error(`value does not fit in a word: ${hexNoPrefix}`);
+    return hexNoPrefix.padStart(64, "0");
+}
+function encodeAddress(value) {
+    if (!HEX_ADDRESS.test(value)) {
+        throw new Error(`not a 20-byte hex address: "${value}"`);
+    }
+    // Lowercased for encoding only. EIP-55 case is a checksum for humans and is
+    // meaningless on the wire; the caller keeps the checksummed form for display.
+    return word(value.slice(2).toLowerCase());
+}
+function encodeUint256(value) {
+    const n = typeof value === "bigint" ? value : BigInt(value);
+    if (n < 0n)
+        throw new Error(`uint256 cannot be negative: ${n}`);
+    if (n > UINT256_MAX)
+        throw new Error(`value ${n} exceeds uint256 max`);
+    return word(n.toString(16));
+}
+
+;// CONCATENATED MODULE: ./src/drivers/erc20-approve/abi.ts
+// ABI encoding for ERC-20 `transferFrom`. Chain primitives live here and only
+// here — core and adapters may not import this file (I1).
+//
+//   function transferFrom(address from, address to, uint256 value) returns (bool)
+//
+// Unlike the AllowanceModule, `value` is a full uint256.
+
+const TRANSFER_FROM_SIGNATURE = "transferFrom(address,address,uint256)";
+/**
+ * keccak256(SIGNATURE)[0..4]. Pinned as a constant so encoding costs no hash,
+ * and re-derived in the tests so it can never silently drift from the signature
+ * string above.
+ */
+const TRANSFER_FROM_SELECTOR = "0x23b872dd";
+function encodeTransferFrom(call) {
+    return (TRANSFER_FROM_SELECTOR +
+        encodeAddress(call.from) +
+        encodeAddress(call.to) +
+        encodeUint256(call.amount));
+}
+
+;// CONCATENATED MODULE: ./src/drivers/erc20-approve/driver.ts
+
+
+const CAPABILITIES = {
+    offlineVerify: true,
+    needsGas: true,
+    // CI holds the delegate key, so this cannot register in tier 0 (I3).
+    needsSecret: true,
+    // GitPay never holds funds; the token moves from the payer's wallet straight
+    // to the recipient in one call (I2).
+    custodial: false,
+    /**
+     * False. `transferFrom` has no nonce at all: an identical second call moves
+     * the tokens again while the approval has headroom. I9 therefore requires a
+     * ledger.
+     */
+    nativeReplayProtection: false,
+};
+const ERC20_APPROVE_SCHEME = "approve";
+/**
+ * Pays from an ordinary wallet that has called `approve(delegate, N)` on the
+ * token. No Safe, no module, no contract of ours: the token's own allowance is
+ * the authorization, and the chain enforces it.
+ *
+ * The bound differs from the Safe's in one way that matters. An ERC-20
+ * allowance does not reset, so a leaked delegate key can spend what is left of
+ * it exactly once — and the maintainer has to top it up when it runs out.
+ */
+class Erc20ApproveDriver {
+    config;
+    id = "erc20-approve/eip155";
+    capabilities = CAPABILITIES;
+    sender;
+    constructor(config) {
+        this.config = config;
+        this.sender = new EvmSender({
+            network: config.network,
+            chainId: config.chainId,
+            rpcUrl: config.rpcUrl,
+            privateKey: config.delegatePrivateKey,
+            gasLimit: config.gasLimit,
+        });
+        // The whole point of the approval is that CI holds a key that can spend
+        // only what was approved. A delegate that IS the payer is the payout
+        // wallet's own key in CI, with nothing on-chain bounding it.
+        if (this.sender.address.toLowerCase() === config.payerAddress.toLowerCase()) {
+            throw new Error(`The delegate key controls the payer ${config.payerAddress} itself. ` +
+                "Create a separate delegate address, approve it from the payer wallet, " +
+                "and put the delegate's key in CI instead.");
+        }
+    }
+    supports(network, scheme) {
+        return network === this.config.network && scheme === ERC20_APPROVE_SCHEME;
+    }
+    buildRequirements(ctx) {
+        return {
+            scheme: ERC20_APPROVE_SCHEME,
+            network: ctx.intent.network,
+            amount: ctx.intent.amount,
+            asset: ctx.intent.asset,
+            payTo: ctx.target.address,
+            maxTimeoutSeconds: 300,
+            extra: { payer: this.config.payerAddress, delegate: this.sender.address },
+        };
+    }
+    /**
+     * There is no counterparty signature to check here — the delegate's authority
+     * is the token allowance itself, enforced on-chain. Verification is a shape
+     * check so a malformed requirement fails before a transaction is built.
+     */
+    verify(_p, r) {
+        if (r.scheme !== ERC20_APPROVE_SCHEME || r.network !== this.config.network) {
+            return Promise.resolve({ isValid: false, reason: "DOMAIN_MISMATCH" });
+        }
+        if (!/^0x[0-9a-fA-F]{40}$/.test(r.payTo)) {
+            return Promise.resolve({ isValid: false, reason: "RECIPIENT_MISMATCH" });
+        }
+        if (!/^[0-9]+$/.test(r.amount) || BigInt(r.amount) === 0n) {
+            return Promise.resolve({ isValid: false, reason: "AMOUNT_MISMATCH" });
+        }
+        return Promise.resolve({ isValid: true, payer: this.config.payerAddress });
+    }
+    /**
+     * Signs. Reads chain state but writes nothing, so no funds can move here. The
+     * simulation catches a spent allowance and an empty wallet for zero gas.
+     */
+    prepare(_p, r) {
+        const data = encodeTransferFrom({ from: this.config.payerAddress, to: r.payTo, amount: r.amount });
+        return this.sender.prepare({ to: this.config.tokenAddress, data }, refuseFalse);
+    }
+    /** The irreversible step. Everything before this can be abandoned safely. */
+    broadcast(prepared) {
+        return this.sender.broadcast(prepared);
+    }
+}
+/**
+ * Some ERC-20s report failure by returning `false` instead of reverting. That
+ * transaction would be mined with status 1 and read as a settled payout that
+ * moved nothing. Tokens that return no data at all are accepted, as every
+ * ERC-20 library accepts them.
+ */
+function refuseFalse(returned) {
+    if (/^0x0{64}$/.test(returned)) {
+        throw Object.assign(new Error("simulation returned false: the token refused the transfer"), {
+            code: "SIMULATION_REVERT",
+        });
+    }
+}
+
+;// CONCATENATED MODULE: ./src/drivers/safe-allowance/abi.ts
+// ABI encoding for Safe's AllowanceModule. Chain primitives live here and only
+// here — core and adapters may not import this file (I1).
+//
+// Verified signature, read from allowances/contracts/AllowanceModule.sol:
+//
+//   function executeAllowanceTransfer(
+//       ISafe safe, address token, address payable to, uint96 amount,
+//       address paymentToken, uint96 payment, address delegate, bytes signature
+//   ) public
+//
+// `amount` and `payment` are uint96, NOT uint256. Assuming uint256 yields a
+// different selector and the call reverts with nothing useful to read.
+
+/** Interface types collapse to `address` for selector purposes. */
+const EXECUTE_ALLOWANCE_TRANSFER_SIGNATURE = "executeAllowanceTransfer(address,address,address,uint96,address,uint96,address,bytes)";
+/**
+ * keccak256(SIGNATURE)[0..4]. Pinned as a constant so encoding costs no hash,
+ * and re-derived in the tests so it can never silently drift from the signature
+ * string above.
+ */
+const EXECUTE_ALLOWANCE_TRANSFER_SELECTOR = "0x4515641a";
+const UINT96_MAX = (1n << 96n) - 1n;
+const HEX_BYTES = /^0x(?:[0-9a-fA-F]{2})*$/;
+function encodeUint96(value) {
+    const n = typeof value === "bigint" ? value : BigInt(value);
+    if (n < 0n)
+        throw new Error(`uint96 cannot be negative: ${n}`);
+    if (n > UINT96_MAX) {
+        throw new Error(`value ${n} exceeds uint96 max ${UINT96_MAX}`);
+    }
+    return word(n.toString(16));
+}
+/** Dynamic `bytes`: a length word, then the data padded up to a word boundary. */
+function encodeBytesTail(value) {
+    if (!HEX_BYTES.test(value)) {
+        throw new Error(`not an even-length hex byte string: "${value}"`);
+    }
+    const data = value.slice(2).toLowerCase();
+    const byteLength = data.length / 2;
+    const padded = byteLength === 0 ? "" : data.padEnd(Math.ceil(byteLength / 32) * 64, "0");
+    return word(byteLength.toString(16)) + padded;
+}
+/** Offset to the `bytes` tail: 8 head words. */
+const BYTES_OFFSET = 8n * 32n;
+function encodeExecuteAllowanceTransfer(call) {
+    const head = [
+        encodeAddress(call.safe),
+        encodeAddress(call.token),
+        encodeAddress(call.to),
+        encodeUint96(call.amount),
+        encodeAddress(call.paymentToken ?? ZERO_ADDRESS),
+        encodeUint96(call.payment ?? 0n),
+        encodeAddress(call.delegate),
+        word(BYTES_OFFSET.toString(16)),
+    ].join("");
+    return EXECUTE_ALLOWANCE_TRANSFER_SELECTOR + head + encodeBytesTail(call.signature ?? "0x");
+}
+
+;// CONCATENATED MODULE: ./src/drivers/safe-allowance/driver.ts
+
+
+const driver_CAPABILITIES = {
+    offlineVerify: true,
+    needsGas: true,
+    // CI holds the delegate key, so this cannot register in tier 0 (I3).
+    needsSecret: true,
+    // GitPay never holds funds; the Safe pays the recipient directly (I2).
+    custodial: false,
+    /**
+     * Honestly false. On the `msg.sender == delegate` path the module checks
+     * caller identity only — the nonce is consumed as signed-hash input and never
+     * compared against a stored value, so an identical second call transfers
+     * again while the allowance has headroom. I9 therefore requires a ledger.
+     */
+    nativeReplayProtection: false,
+};
+const SAFE_ALLOWANCE_SCHEME = "allowance";
+class SafeAllowanceDriver {
+    config;
+    id = "safe-allowance/eip155";
+    capabilities = driver_CAPABILITIES;
+    sender;
+    constructor(config) {
+        this.config = config;
+        this.sender = new EvmSender({
+            network: config.network,
+            chainId: config.chainId,
+            rpcUrl: config.rpcUrl,
+            privateKey: config.delegatePrivateKey,
+            gasLimit: config.gasLimit,
+        });
+    }
+    supports(network, scheme) {
+        return network === this.config.network && scheme === SAFE_ALLOWANCE_SCHEME;
+    }
+    buildRequirements(ctx) {
+        return {
+            scheme: SAFE_ALLOWANCE_SCHEME,
+            network: ctx.intent.network,
+            amount: ctx.intent.amount,
+            asset: ctx.intent.asset,
+            payTo: ctx.target.address,
+            maxTimeoutSeconds: 300,
+            extra: { safe: this.config.safeAddress, delegate: this.sender.address },
+        };
+    }
+    /**
+     * There is no counterparty signature to check here — the delegate's authority
+     * is the allowance itself, enforced on-chain. Verification is a shape check so
+     * a malformed requirement fails before a transaction is built.
+     */
+    verify(_p, r) {
+        if (r.scheme !== SAFE_ALLOWANCE_SCHEME || r.network !== this.config.network) {
+            return Promise.resolve({ isValid: false, reason: "DOMAIN_MISMATCH" });
+        }
+        if (!/^0x[0-9a-fA-F]{40}$/.test(r.payTo)) {
+            return Promise.resolve({ isValid: false, reason: "RECIPIENT_MISMATCH" });
+        }
+        if (!/^[0-9]+$/.test(r.amount) || BigInt(r.amount) === 0n) {
+            return Promise.resolve({ isValid: false, reason: "AMOUNT_MISMATCH" });
+        }
+        return Promise.resolve({ isValid: true, payer: this.config.safeAddress });
+    }
+    /** Signs. Reads chain state but writes nothing, so no funds can move here. */
+    prepare(_p, r) {
+        const data = encodeExecuteAllowanceTransfer({
+            safe: this.config.safeAddress,
+            token: this.config.tokenAddress,
+            to: r.payTo,
+            amount: r.amount,
+            delegate: this.sender.address,
+            // msg.sender is the delegate, so no signature is needed. This path has no
+            // replay protection, which is why nativeReplayProtection is false.
+            signature: "0x",
+        });
+        return this.sender.prepare({ to: this.config.moduleAddress, data });
+    }
+    /** The irreversible step. Everything before this can be abandoned safely. */
+    broadcast(prepared) {
+        return this.sender.broadcast(prepared);
+    }
 }
 
 ;// CONCATENATED MODULE: ./src/adapters/github/trigger.ts
@@ -5675,6 +5870,7 @@ class ResolverChain {
 
 
 
+
 async function run() {
     // First, before anything is parsed or resolved: an unknown mode is refused
     // rather than read as "not dry-run", which would settle on a typo (I5).
@@ -5785,7 +5981,7 @@ async function run() {
     }
     if (maxPerPayout === undefined) {
         // Only worth saying on a path that actually moves money.
-        console.warn("no max_per_payout set — the Safe's allowance period cap is the only ceiling on this payout.");
+        console.warn("no max_per_payout set — the on-chain allowance is the only ceiling on this payout.");
     }
     const required = (name) => {
         const value = readInput(name);
@@ -5815,15 +6011,43 @@ async function run() {
         }
         return value;
     };
-    const driver = new SafeAllowanceDriver({
+    /**
+     * The scheme picks the driver, and only the chosen one is constructed, so each
+     * asks for its own inputs: `safe` under `allowance`, `payer` under `approve`.
+     * `from` is the account the funds leave, shown on the receipt.
+     */
+    const evm = () => ({
         network: intent.network,
         chainId: BigInt(derived("chain_id", chain?.chainId.toString())),
         rpcUrl: required("rpc_url"),
-        moduleAddress: derived("allowance_module", chain?.allowanceModule),
-        safeAddress: required("safe"),
         tokenAddress: required("token"),
         delegatePrivateKey: required("delegate_key"),
     });
+    const schemes = {
+        [SAFE_ALLOWANCE_SCHEME]: () => {
+            const safeAddress = required("safe");
+            const moduleAddress = derived("allowance_module", chain?.allowanceModule);
+            return {
+                driver: new SafeAllowanceDriver({ ...evm(), safeAddress, moduleAddress }),
+                from: safeAddress,
+                fromLabel: "Safe",
+            };
+        },
+        [ERC20_APPROVE_SCHEME]: () => {
+            const payerAddress = required("payer");
+            return {
+                driver: new Erc20ApproveDriver({ ...evm(), payerAddress }),
+                from: payerAddress,
+                fromLabel: "Wallet",
+            };
+        },
+    };
+    // Own keys only: `scheme: constructor` must not find Object.prototype's.
+    const build = Object.hasOwn(schemes, intent.scheme) ? schemes[intent.scheme] : undefined;
+    if (!build) {
+        throw new GitPayError("DRIVER_NOT_FOUND", `No driver for scheme "${intent.scheme}". Supported: ${Object.keys(schemes).join(", ")}`);
+    }
+    const { driver, from, fromLabel } = build();
     /**
      * Tier 1, not 0: CI holds the delegate key, so this is an adopter-operated
      * process with its own credentials. I3 would reject it at tier 0, correctly —
@@ -5843,7 +6067,8 @@ async function run() {
             amount: command?.amount ?? intent.amount,
             asset: intent.asset,
             to: target.address,
-            from: readInput("safe"),
+            from,
+            fromLabel,
             actor: intent.source.actor,
             network: intent.network,
             explorerUrl,

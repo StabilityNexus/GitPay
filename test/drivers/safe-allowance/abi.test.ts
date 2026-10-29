@@ -2,11 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { keccak_256 } from "@noble/hashes/sha3";
 
+import { ZERO_ADDRESS, encodeAddress } from "../../../src/drivers/evm/abi.js";
 import {
   EXECUTE_ALLOWANCE_TRANSFER_SELECTOR,
   EXECUTE_ALLOWANCE_TRANSFER_SIGNATURE,
-  ZERO_ADDRESS,
-  encodeAddress,
   encodeExecuteAllowanceTransfer,
   encodeUint96,
 } from "../../../src/drivers/safe-allowance/abi.js";

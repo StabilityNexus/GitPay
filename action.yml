@@ -59,10 +59,13 @@ inputs:
     default: "eip155:11155111"
   scheme:
     description: >
-      Settlement scheme. `allowance` is the only one implemented — it settles via
-      Safe's AllowanceModule. Was `exact` (x402 over EIP-3009) before the pivot;
-      that default shipped with no driver behind it, so every real settlement
-      failed with DRIVER_NOT_FOUND.
+      Settlement scheme. `allowance` pays from a Safe through its AllowanceModule,
+      within a spending limit that resets every period (needs `safe`). `approve`
+      pays from an ordinary wallet — MetaMask, Rabby, a hardware wallet — that
+      called `approve(delegate, N)` on the token; the approval does not reset, so
+      it is topped up by hand (needs `payer`). Was `exact` (x402 over EIP-3009)
+      before the pivot; that default shipped with no driver behind it, so every
+      real settlement failed with DRIVER_NOT_FOUND.
     required: false
     default: "allowance"
   round:
@@ -115,7 +118,13 @@ inputs:
       attempt is already recorded.
     required: false
   safe:
-    description: "Address of the Safe holding the funds."
+    description: "Address of the Safe holding the funds. Used when `scheme` is `allowance`."
+    required: false
+  payer:
+    description: >
+      Address of the ordinary wallet holding the funds, which has approved the
+      delegate on `token`. Used when `scheme` is `approve`. Must not be the
+      delegate itself: that would put the payout wallet's own key in CI.
     required: false
   token:
     description: "ERC-20 being paid out."
@@ -127,10 +136,11 @@ inputs:
     required: false
   delegate_key:
     description: >
-      Private key of the delegate the spending limit was granted to. Pass from a
-      secret, never inline. It can only spend within the allowance and cannot
-      change the recipient of an existing one — but it CAN send the allowance
-      anywhere, so size the period cap to what you can afford to lose.
+      Private key of the delegate: the address the Safe's spending limit was
+      granted to (`allowance`), or the address the payer approved (`approve`).
+      Pass from a secret, never inline. It can only spend within the allowance,
+      but it CAN send that allowance anywhere, so size it to what you can afford
+      to lose.
     required: false
   explorer_url:
     description: >

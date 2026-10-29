@@ -69,7 +69,10 @@ export function formatReceipt(receipt: Receipt, context: PayoutContext = {}): st
       : undefined;
 
   const rows: [string, string][] = [];
-  if (context.from) rows.push(["From", `Safe ${link(explorer, "address", context.from)}`]);
+  if (context.from) {
+    const label = context.fromLabel ? `${context.fromLabel} ` : "";
+    rows.push(["From", `${label}${link(explorer, "address", context.from)}`]);
+  }
   if (context.actor) rows.push(["Authorized by", `@${context.actor}`]);
   if (context.network) rows.push(["Network", `\`${context.network}\``]);
   if (receipt.transaction) {

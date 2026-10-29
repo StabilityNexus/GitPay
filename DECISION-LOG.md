@@ -661,3 +661,56 @@ interpolated into the script.
 **Still open.** The policy result table is printed to the log but not yet rendered into the PR
 comment (ROADMAP week 4). `.xops.yml` remains the planned home for this configuration; `Policy`
 is a plain record so a loader can produce it without touching the evaluator.
+
+---
+
+## 13. ✅ DECIDED (2026-10-28) — a second scheme, `approve`, for adopters without a Safe
+
+**The ask.** Not every maintainer has, or wants, a Safe. The wallets people already have are
+MetaMask, Rabby, Phantom on EVM and hardware wallets. Requiring Safe{Wallet} is a real adoption
+cost, not just a click-through.
+
+**The decision.** Keep `allowance` as the default, and add `scheme: approve` beside it: the
+maintainer calls `approve(delegate, N)` on the token from an ordinary wallet, and CI calls
+`transferFrom(wallet, recipient, amount)` with the delegate key. This is the "plain ERC-20
+`approve` to operator EOA" row from §6, which that section already called "probably 90% of the
+win with zero new contracts".
+
+| | `allowance` (Safe) | `approve` (any wallet) |
+|---|---|---|
+| Setup | Safe, module, spending limit | One `approve` transaction |
+| Ongoing chore | None — the cap resets | Top up when the allowance runs out |
+| Leaked delegate key | One period's cap, every period until revoked | What is left of the allowance, once |
+| Revoke | Remove the delegate | `approve(delegate, 0)` |
+
+So `approve` gives back chore #2 from §5 in exchange for dropping the Safe, and its blast
+radius is *smaller* — it is not cumulative. Neither dominates; the adopter chooses.
+
+**What did not change.** Custody (I2): tokens move from the adopter's wallet to the recipient in
+one call. Replay (I9): `transferFrom` has no nonce, so the driver declares
+`nativeReplayProtection: false` and the receipt ledger is mandatory, exactly as before. The
+idempotency key: `scheme` is not in it, deliberately — switching a repo between rails must
+collide with, not re-pay, what was already paid. Core: untouched apart from an optional receipt
+label.
+
+**Shape.** The nonce check, simulation, gas estimation, signing and broadcast moved verbatim
+from the Safe driver into `src/drivers/evm/sender.ts`; each driver now supplies only its
+calldata. `main.ts` picks the driver by `scheme` and asks for `safe` or `payer` accordingly.
+`payer` is a new input; `safe` was not repurposed (the v1 schema is frozen).
+
+**Two guards specific to `approve`.**
+- The driver refuses a delegate key that controls the payer. That configuration is the payout
+  wallet's own key in CI, with nothing on-chain bounding it — the one setup this design must not
+  make easy.
+- A simulated `transferFrom` that *returns* `false` is refused before the ledger is written.
+  Some tokens fail that way instead of reverting, and the mined transaction would read as a
+  settled payout that moved nothing.
+
+**Considered and deferred.** EIP-2612 `permit` (sign instead of transact; still per-approval,
+adds a deadline). MetaMask's delegation framework (EIP-7702 / ERC-7710) would restore a
+period-resetting cap without a Safe, but ties the rail to one wallet vendor's contracts. Phantom
+on Solana has the same approve-a-delegate primitive in SPL Token, but Solana is a second network
+and stays gated by `REFERENCES.md` §2.4.
+
+**Still open.** Live verification on Sepolia: a real `approve` payout and a replay recorded in
+`docs/VERIFIED_CHAINS.md`, as the `allowance` rail has.

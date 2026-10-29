@@ -6,12 +6,12 @@ import {
   hexToBytes,
   rlpEncode,
   toMinimalBytes,
-} from "../../../src/drivers/safe-allowance/rlp.js";
+} from "../../../src/drivers/evm/rlp.js";
 import {
   addressFromPrivateKey,
   signTransaction,
   signingHash,
-} from "../../../src/drivers/safe-allowance/tx.js";
+} from "../../../src/drivers/evm/tx.js";
 
 const hex = (input: Parameters<typeof rlpEncode>[0]): string => bytesToHex(rlpEncode(input));
 

@@ -1,3 +1,17 @@
+## 0. Pay from an ordinary wallet (`scheme: approve`) — built, awaiting live verification
+
+**What.** Adopters with no Safe pay from MetaMask, Rabby or a hardware wallet. The maintainer
+calls `approve(delegate, N)` on the token once; CI pays with `transferFrom`.
+
+**Status.** Driver, inputs and tests are in (`src/drivers/erc20-approve/`, `DECISION-LOG.md`
+§13). `allowance` stays the default.
+
+**Done when.** A real `approve` payout settles on Ethereum Sepolia from a merged PR, a replay of
+it reports `already-paid` with no second transfer, and both are listed in
+`docs/VERIFIED_CHAINS.md`.
+
+---
+
 ## 1. Native currency payouts
 
 **What.** `/send @alice 0.01 ETH` — pay in the chain's own currency, not only in an ERC-20.

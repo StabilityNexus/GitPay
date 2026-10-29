@@ -45,8 +45,10 @@ export interface PayoutContext {
   asset?: string | undefined;
   /** Recipient address. */
   to?: string | undefined;
-  /** The account the funds left — the Safe, not the delegate. */
+  /** The account the funds left — the Safe or the approving wallet, never the delegate. */
   from?: string | undefined;
+  /** What `from` is, for the reader: "Safe", "Wallet". */
+  fromLabel?: string | undefined;
   /** Who authorized it. */
   actor?: string | undefined;
   network?: string | undefined;
