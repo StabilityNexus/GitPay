@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { Reveal, useCopy } from "../components/ui";
-import { cx, usePrefersReducedMotion } from "../hooks";
+import { cx, tabKeyTarget, usePrefersReducedMotion } from "../hooks";
 
 const C = ({ children }: { children: ReactNode }) => <span className="c">{children}</span>;
 const K = ({ children }: { children: ReactNode }) => <span className="k">{children}</span>;
@@ -60,6 +60,10 @@ const GO_LIVE = (
     <K>cancel-in-progress:</K>
     {" false   "}
     <C># never cancel mid-payout</C>
+    {"\n  "}
+    <K>queue:</K>
+    {" max   "}
+    <C># keep every waiting /send</C>
     {"\n\n        "}
     <K>with:</K>
     {"\n          "}
@@ -127,6 +131,8 @@ export function GetStarted() {
   const [tab, setTab] = useState(0);
   const [label, setLabel] = useState("Copy");
   const code = useRef<HTMLPreElement>(null);
+  const tabs = useRef<Array<HTMLButtonElement | null>>([]);
+  const id = useId();
   const copy = useCopy();
 
   return (
@@ -155,7 +161,26 @@ export function GetStarted() {
             <div className="win-bar">
               <div className="tabs" role="tablist" aria-label="Workflow examples">
                 {TABS.map(({ label: tabLabel }, i) => (
-                  <button key={tabLabel} type="button" role="tab" aria-selected={tab === i} onClick={() => setTab(i)}>
+                  <button
+                    key={tabLabel}
+                    ref={(el) => {
+                      tabs.current[i] = el;
+                    }}
+                    type="button"
+                    role="tab"
+                    id={`${id}-t${i}`}
+                    aria-selected={tab === i}
+                    aria-controls={`${id}-panel`}
+                    tabIndex={tab === i ? 0 : -1}
+                    onClick={() => setTab(i)}
+                    onKeyDown={(e) => {
+                      const next = tabKeyTarget(e.key, tab, TABS.length);
+                      if (next === null) return;
+                      e.preventDefault();
+                      setTab(next);
+                      tabs.current[next]?.focus();
+                    }}
+                  >
                     {tabLabel}
                   </button>
                 ))}
@@ -169,7 +194,15 @@ export function GetStarted() {
                 {label}
               </button>
             </div>
-            <pre key={tab} ref={code} className={cx("code", !reduced && "swap")}>
+            <pre
+              key={tab}
+              ref={code}
+              id={`${id}-panel`}
+              role="tabpanel"
+              aria-labelledby={`${id}-t${tab}`}
+              tabIndex={0}
+              className={cx("code", !reduced && "swap")}
+            >
               {TABS[tab]?.code}
             </pre>
           </div>

@@ -91,3 +91,13 @@ export function useCountUp(target: number, play: number, durationMs = 900): numb
 export function cx(...names: Array<string | false | null | undefined>): string {
   return names.filter(Boolean).join(" ");
 }
+
+/** The tab an arrow, Home or End key moves to, per the ARIA tabs pattern; null for any other key. */
+export function tabKeyTarget(key: string, current: number, count: number): number | null {
+  const last = count - 1;
+  if (key === "ArrowRight") return current === last ? 0 : current + 1;
+  if (key === "ArrowLeft") return current === 0 ? last : current - 1;
+  if (key === "Home") return 0;
+  if (key === "End") return last;
+  return null;
+}

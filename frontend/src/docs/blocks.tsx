@@ -1,6 +1,6 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { useCopy } from "../components/ui";
-import { cx } from "../hooks";
+import { cx, tabKeyTarget } from "../hooks";
 
 /** Colours a YAML or shell snippet: comments, keys and quoted strings. Plain text otherwise. */
 function highlight(code: string): ReactNode[] {
@@ -41,10 +41,14 @@ export function Code({ title, code }: { title: string; code: string }) {
         <button
           className="btn btn-ghost btn-sm"
           type="button"
+          aria-label={`Copy ${title}`}
           onClick={(e) => void copy(code, e.currentTarget.closest(".doc-code")?.querySelector("pre") ?? null, setLabel)}
         >
           {label}
         </button>
+        <span className="sr" aria-live="polite">
+          {label === "Copy" ? "" : label}
+        </span>
       </div>
       <pre className="code">{highlight(code)}</pre>
     </div>
@@ -52,22 +56,34 @@ export function Code({ title, code }: { title: string; code: string }) {
 }
 
 /** A tabbed choice between equivalent ways of doing one step. */
-export function Tabs({ items }: { items: Array<{ label: string; body: ReactNode }> }) {
+export function Tabs({ label, items }: { label: string; items: Array<{ label: string; body: ReactNode }> }) {
   const [on, setOn] = useState(0);
   const id = useId();
+  const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   return (
     <div className="doc-tabs">
-      <div className="seg" role="tablist">
+      <div className="seg" role="tablist" aria-label={label}>
         {items.map((t, i) => (
           <button
             key={t.label}
+            ref={(el) => {
+              tabs.current[i] = el;
+            }}
             type="button"
             role="tab"
             id={`${id}-t${i}`}
             aria-selected={on === i}
             aria-controls={`${id}-p${i}`}
+            tabIndex={on === i ? 0 : -1}
             className={cx(on === i && "on")}
             onClick={() => setOn(i)}
+            onKeyDown={(e) => {
+              const next = tabKeyTarget(e.key, on, items.length);
+              if (next === null) return;
+              e.preventDefault();
+              setOn(next);
+              tabs.current[next]?.focus();
+            }}
           >
             {t.label}
           </button>
@@ -101,10 +117,10 @@ export function Step({ n, title, id, children }: { n: number; title: string; id?
 
 export function Callout({ kind = "note", title, children }: { kind?: "note" | "warn" | "ok"; title: string; children: ReactNode }) {
   return (
-    <aside className={cx("callout", `callout-${kind}`)}>
+    <div role="note" className={cx("callout", `callout-${kind}`)}>
       <b>{title}</b>
       <div>{children}</div>
-    </aside>
+    </div>
   );
 }
 

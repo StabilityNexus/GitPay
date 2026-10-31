@@ -193,7 +193,7 @@ export function DocsPage() {
               limit that resets each period, or a wallet approval that you top up by hand.
             </Callout>
             <div className="compare doc-table">
-              <table>
+              <table aria-label="Safe versus wallet">
                 <thead>
                   <tr>
                     <th>Pay from</th>
@@ -293,6 +293,7 @@ export function DocsPage() {
                 account for it. Do not use a Safe owner or your personal wallet.
               </p>
               <Tabs
+                label="How to create the delegate"
                 items={[
                   {
                     label: "MetaMask",
@@ -430,7 +431,7 @@ export function DocsPage() {
             </p>
 
             <div className="compare doc-table">
-              <table>
+              <table aria-label="Repository secrets and variables">
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -476,6 +477,7 @@ export function DocsPage() {
 
             <Step n={1} title="Get an RPC URL">
               <Tabs
+                label="Where to get an RPC URL"
                 items={[
                   {
                     label: "Alchemy",
@@ -512,6 +514,7 @@ export function DocsPage() {
 
             <Step n={2} title="Add them to the repository">
               <Tabs
+                label="How to add the values"
                 items={[
                   {
                     label: "GitHub website",
@@ -555,6 +558,7 @@ export function DocsPage() {
             <Step n={1} title="Update the workflow">
               <p>Pick the tab for the account you set up in Part 2. They differ only in the account lines.</p>
               <Tabs
+                label="Live workflow for your account"
                 items={[
                   { label: "Safe", body: <Code title=".github/workflows/gitpay.yml" code={live("safe")} /> },
                   { label: "Wallet (MetaMask…)", body: <Code title=".github/workflows/gitpay.yml" code={live("wallet")} /> },
@@ -607,7 +611,8 @@ export function DocsPage() {
               <Code title="PR comment" code="/send 0xRecipientAddress 1 USDC round:1" />
               <p>
                 A new round is a new payout, so this one settles and posts its own receipt. Use it for a genuine second
-                payment, or to retry one that never landed.
+                payment, or to retry one whose transaction failed or was dropped. If that transaction is still pending,
+                wait for it first.
               </p>
             </Step>
             <Step n={4} title="Go over the cap">
@@ -634,7 +639,7 @@ export function DocsPage() {
             <h2>Troubleshooting</h2>
             <p className="lede">Each run writes a status and, on failure, an error code to the log.</p>
             <div className="compare doc-table">
-              <table>
+              <table aria-label="Troubleshooting">
                 <thead>
                   <tr>
                     <th>You see</th>
@@ -677,8 +682,9 @@ export function DocsPage() {
                     <th><code>unconfirmed</code></th>
                     <td>
                       An earlier attempt recorded a transaction that GitPay could not confirm, so nothing was paid by
-                      this run. Open the transaction on Etherscan. If it succeeded, the contributor is paid. If it failed
-                      or never landed, send the command again with <code>round:1</code> (or the next round).
+                      this run. Open the transaction on Etherscan. If it succeeded, the contributor is paid. If it is
+                      still pending, wait. Only if it failed, or was dropped or replaced, send the command again with{" "}
+                      <code>round:1</code> (or the next round).
                     </td>
                   </tr>
                   <tr>
