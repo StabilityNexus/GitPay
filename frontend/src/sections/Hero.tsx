@@ -153,7 +153,7 @@ export function Hero() {
             </span>
           </h1>
           <p className="lede">
-            GitPay is a GitHub Action that settles payouts straight from your project's Safe. A maintainer types{" "}
+            GitPay is a GitHub Action that settles payouts straight from your project's Safe or wallet. A maintainer types{" "}
             <code>/send</code> on the pull request, your declared policy approves it, and the receipt lands back in
             the thread. No servers, no custody, no per-payout signing.
           </p>
@@ -167,7 +167,7 @@ export function Hero() {
             </a>
           </div>
           <div className="facts">
-            {["Runs in your own CI", "Funds stay in your Safe", "Zero secrets to try it"].map((f) => (
+            {["Runs in your own CI", "Funds stay in your Safe or wallet", "Zero secrets to try it"].map((f) => (
               <span key={f}>
                 <Check />
                 {f}

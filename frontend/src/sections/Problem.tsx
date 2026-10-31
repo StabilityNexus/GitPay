@@ -13,7 +13,7 @@ const CHORES: Array<[string, string?]> = [
 ];
 
 const COMPARE: Array<[string, string, string, string, ("manual" | "hosted")?]> = [
-  ["Who holds the funds", "You", "The platform", "You, in your Safe", "hosted"],
+  ["Who holds the funds", "You", "The platform", "You, in your Safe or wallet", "hosted"],
   ["Work per payout", "Open wallet, copy, sign, post hash", "Approve in their dashboard", "One /send comment", "manual"],
   ["Server someone must run", "None", "Theirs, always", "None. It runs in your Actions", "hosted"],
   ["Protection from paying twice", "A spreadsheet and memory", "Their database", "Receipt ledger in the PR", "manual"],
@@ -77,7 +77,7 @@ export function Problem() {
             </p>
             <p>
               <strong>GitPay takes neither path.</strong> It is a versioned Action that runs in your CI. Funds stay in
-              your Safe until the moment they go to the contributor, in one direct transfer.
+              your Safe or wallet until the moment they go to the contributor, in one direct transfer.
             </p>
             <div className="vs">
               <div className="vs-row">
@@ -97,7 +97,7 @@ export function Problem() {
               <div className="vs-row us">
                 <div>
                   <h3>GitPay</h3>
-                  <p>One comment. Your Safe pays directly.</p>
+                  <p>One comment. Your Safe or wallet pays directly.</p>
                 </div>
                 <span className="pill pill-mid">1 step</span>
               </div>

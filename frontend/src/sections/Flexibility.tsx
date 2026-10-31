@@ -8,7 +8,7 @@ const KEY_PARTS: Array<[string, string, string]> = [
   ["0x9f3a…7c21", "The resolved recipient", " address"],
   ["eip155:11155111", "Network in CAIP-2 form", ", so each chain gets its own key"],
   ["USDC", "The asset", ", so multi-asset payouts need no special case"],
-  ["0", "Round", ": bump it to pay the same person again on purpose"],
+  ["0", "Round", ": /send … round:1 pays the same person again, on purpose"],
 ];
 
 function IdempotencyKey() {

@@ -83,9 +83,48 @@ const GO_LIVE = (
   </>
 );
 
+/* Same job as GO_LIVE; only the account the funds leave differs. */
+const GO_LIVE_WALLET = (
+  <>
+    <C># no Safe: pay from MetaMask or any wallet that ran</C>
+    {"\n"}
+    <C># USDC.approve(delegate, amount) once. Same concurrency block.</C>
+    {"\n        "}
+    <K>with:</K>
+    {"\n          "}
+    <C># the three inputs above, plus:</C>
+    {"\n          "}
+    <K>mode:</K> <S>self</S>
+    {"\n          "}
+    <K>scheme:</K> <S>approve</S>
+    {"\n          "}
+    <K>max_per_payout:</K> <S>"5"</S>
+    {"\n          "}
+    <K>rpc_url:</K> {expr("secrets.GITPAY_RPC_URL")}
+    {"\n          "}
+    <K>payer:</K> <S>"0xYourWallet"</S>
+    {"   "}
+    <C># approved the delegate</C>
+    {"\n          "}
+    <K>token:</K> <S>"0xYourToken"</S>
+    {"\n          "}
+    <K>delegate_key:</K> {expr("secrets.GITPAY_DELEGATE_KEY")}
+    {"\n          "}
+    <K>pr:</K> {expr("github.event.issue.number")}
+    {"\n          "}
+    <K>github_token:</K> {expr("secrets.GITHUB_TOKEN")}
+  </>
+);
+
+const TABS = [
+  { label: "1 · dry run", code: DRY_RUN },
+  { label: "2 · live · Safe", code: GO_LIVE },
+  { label: "2 · live · wallet", code: GO_LIVE_WALLET },
+];
+
 export function GetStarted() {
   const reduced = usePrefersReducedMotion();
-  const [live, setLive] = useState(false);
+  const [tab, setTab] = useState(0);
   const [label, setLabel] = useState("Copy");
   const code = useRef<HTMLPreElement>(null);
   const copy = useCopy();
@@ -115,12 +154,11 @@ export function GetStarted() {
           <div className="window">
             <div className="win-bar">
               <div className="tabs" role="tablist" aria-label="Workflow examples">
-                <button type="button" role="tab" aria-selected={!live} onClick={() => setLive(false)}>
-                  1 · dry run
-                </button>
-                <button type="button" role="tab" aria-selected={live} onClick={() => setLive(true)}>
-                  2 · go live
-                </button>
+                {TABS.map(({ label: tabLabel }, i) => (
+                  <button key={tabLabel} type="button" role="tab" aria-selected={tab === i} onClick={() => setTab(i)}>
+                    {tabLabel}
+                  </button>
+                ))}
               </div>
               <span className="title" />
               <button
@@ -131,8 +169,8 @@ export function GetStarted() {
                 {label}
               </button>
             </div>
-            <pre key={String(live)} ref={code} className={cx("code", !reduced && "swap")}>
-              {live ? GO_LIVE : DRY_RUN}
+            <pre key={tab} ref={code} className={cx("code", !reduced && "swap")}>
+              {TABS[tab]?.code}
             </pre>
           </div>
         </Reveal>

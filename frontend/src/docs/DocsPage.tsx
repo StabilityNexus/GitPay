@@ -29,7 +29,10 @@ const DRY_RUN = lines(
   "          # mode defaults to dry-run. Nothing moves.",
 );
 
-const LIVE = lines(
+/* The live workflow differs between a Safe and a plain wallet only in the
+   account the funds leave: `safe` under the default scheme, or `scheme:
+   approve` and `payer` for a wallet that approved the delegate. */
+const live = (account: "safe" | "wallet") => lines(
   "# .github/workflows/gitpay.yml",
   "name: GitPay",
   "on:",
@@ -58,13 +61,16 @@ const LIVE = lines(
   "          network: sepolia",
   "",
   "          mode: self                      # real settlement, explicitly",
+  ...(account === "wallet" ? ["          scheme: approve                 # pay from a wallet, not a Safe"] : []),
   '          max_per_payout: "5"             # largest single payout, in /send units',
   "          allowed_associations: OWNER,MEMBER,COLLABORATOR",
   "          enabled: ${{ vars.GITPAY_ENABLED || 'true' }}   # kill switch",
   "",
   "          rpc_url: ${{ secrets.GITPAY_RPC_URL }}",
   "          delegate_key: ${{ secrets.GITPAY_DELEGATE_KEY }}",
-  "          safe: ${{ vars.GITPAY_SAFE }}",
+  account === "wallet"
+    ? "          payer: ${{ vars.GITPAY_PAYER }}   # the wallet that approved the delegate"
+    : "          safe: ${{ vars.GITPAY_SAFE }}",
   "          token: ${{ vars.GITPAY_TOKEN }}",
   "          pr: ${{ github.event.issue.number }}",
   "          github_token: ${{ secrets.GITHUB_TOKEN }}",
@@ -76,14 +82,19 @@ const GH_CLI = lines(
   "gh secret set GITPAY_RPC_URL           # paste the RPC URL when prompted",
   "",
   "# variables: public, not sensitive",
-  "gh variable set GITPAY_SAFE  --body 0xYourSafeAddress",
+  "gh variable set GITPAY_SAFE  --body 0xYourSafeAddress     # with a Safe",
+  "gh variable set GITPAY_PAYER --body 0xYourWalletAddress   # or with a wallet",
   "gh variable set GITPAY_TOKEN --body 0xTokenAddress",
 );
+
+/* Circle's USDC on Ethereum Sepolia, the token the walkthrough pays in. */
+const SEPOLIA_USDC = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 
 const SECTIONS = [
   ["overview", "Overview"],
   ["try", "1 · Try it in dry run"],
   ["safe", "2 · Set up the Safe"],
+  ["wallet", "2b · Or: a wallet, no Safe"],
   ["secrets", "3 · Find and add secrets"],
   ["live", "4 · Go live"],
   ["test", "5 · Test it"],
@@ -156,8 +167,8 @@ export function DocsPage() {
             <span className="kicker">Manual integration</span>
             <h1>Add GitPay to your repository</h1>
             <p className="lede">
-              Pay contributors from your own Safe when a maintainer comments <code>/send</code> on a pull request. Start
-              with a dry run that needs no secrets, then go live once your Safe is set up.
+              Pay contributors from your own Safe, or from an ordinary wallet such as MetaMask, when a maintainer
+              comments <code>/send</code> on a pull request. Start with a dry run that needs no secrets, then go live.
             </p>
             <div className="doc-facts">
               <div className="card">
@@ -168,7 +179,7 @@ export function DocsPage() {
               <div className="card">
                 <span className="k">Go live</span>
                 <h3>About 30 minutes, once</h3>
-                <p>A Safe, a spending limit, two secrets. Nothing to do per payout after that.</p>
+                <p>A Safe spending limit or a wallet approval, and two secrets. Nothing to do per payout after that.</p>
               </div>
               <div className="card">
                 <span className="k">Network</span>
@@ -177,9 +188,36 @@ export function DocsPage() {
               </div>
             </div>
             <Callout title="How the money moves">
-              Your Safe pays the contributor directly. GitPay never holds funds and runs no server. Your workflow holds a{" "}
-              <em>delegate</em> key that may spend only up to a limit you set in the Safe, per period.
+              Your Safe or wallet pays the contributor directly. GitPay never holds funds and runs no server. Your
+              workflow holds a <em>delegate</em> key that may spend only up to a limit you set on-chain: a Safe spending
+              limit that resets each period, or a wallet approval that you top up by hand.
             </Callout>
+            <div className="compare doc-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pay from</th>
+                    <th>Setup</th>
+                    <th>Ongoing</th>
+                    <th>If the delegate key leaks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th><a href="#safe">A Safe</a></th>
+                    <td>Safe, spending limit</td>
+                    <td>None; the limit resets each period</td>
+                    <td>One period's limit, every period until revoked</td>
+                  </tr>
+                  <tr>
+                    <th><a href="#wallet">A wallet</a> (MetaMask…)</th>
+                    <td>One <code>approve</code> transaction</td>
+                    <td>Approve again when it runs out</td>
+                    <td>What is left of the approval, once</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section id="try" className="doc-sec">
@@ -324,11 +362,71 @@ export function DocsPage() {
             </Step>
           </section>
 
+          <section id="wallet" className="doc-sec">
+            <span className="kicker">Part 2b · one-time · instead of a Safe</span>
+            <h2>Or: pay from a wallet, no Safe</h2>
+            <p className="lede">
+              Use an ordinary wallet, such as MetaMask, Rabby or a hardware wallet, as the account that pays. You approve
+              a delegate to spend a fixed amount of its USDC, once. Skip this part if you set up a Safe above.
+            </p>
+
+            <Step n={1} title="Fund the paying wallet">
+              <p>
+                In your wallet, on <strong>Sepolia</strong>, get test USDC from{" "}
+                <a href="https://faucet.circle.com" target="_blank" rel="noopener">faucet.circle.com</a> and a little
+                Sepolia ETH for the approval transaction. This wallet holds the USDC you will pay out.
+              </p>
+            </Step>
+
+            <Step n={2} title="Create a delegate account">
+              <p>
+                Exactly as in <a href="#safe">Part 2, step 3</a>: a <strong>new, separate</strong> account whose key goes
+                into CI. Never use the paying wallet's own key. GitPay refuses to run if the delegate key controls the
+                payer, because that would put the wallet itself in CI with no limit.
+              </p>
+            </Step>
+
+            <Step n={3} title="Approve the delegate on USDC">
+              <p>
+                Open the USDC contract on Etherscan:{" "}
+                <a href={`https://sepolia.etherscan.io/address/${SEPOLIA_USDC}#writeProxyContract`} target="_blank" rel="noopener">
+                  sepolia.etherscan.io/address/{SEPOLIA_USDC.slice(0, 6)}…{SEPOLIA_USDC.slice(-4)}
+                </a>
+              </p>
+              <p>
+                <Path parts={["Contract", "Write as Proxy", "Connect to Web3", "approve"]} />
+              </p>
+              <ul className="doc-list">
+                <li>
+                  <strong>spender:</strong> the delegate address from step 2.
+                </li>
+                <li>
+                  <strong>value:</strong> the total you allow, in atomic units. USDC has 6 decimals, so{" "}
+                  <code>50000000</code> is 50 USDC.
+                </li>
+              </ul>
+              <p>Connect the <strong>paying</strong> wallet, not the delegate, and confirm the transaction.</p>
+              <Callout title="It does not refill">
+                Every payout spends from this approval. When it runs out, payouts fail with{" "}
+                <code>SIMULATION_REVERT</code> until you approve again. To see what is left, use{" "}
+                <Path parts={["Read as Proxy", "allowance(owner, spender)"]} />.
+              </Callout>
+            </Step>
+
+            <Step n={4} title="Give the delegate a little gas">
+              <p>
+                As with a Safe, the delegate pays gas for each payout, so send it some Sepolia ETH. The wallet pays the
+                USDC; the delegate only pays gas.
+              </p>
+            </Step>
+          </section>
+
           <section id="secrets" className="doc-sec">
             <span className="kicker">Part 3</span>
             <h2>Find and add your secrets</h2>
             <p className="lede">
-              The workflow reads four values. Two are secret and two are not. Store each where it belongs.
+              The workflow reads four values. Two are secret and two are not. Store each where it belongs. You need{" "}
+              <code>GITPAY_SAFE</code> or <code>GITPAY_PAYER</code>, not both.
             </p>
 
             <div className="compare doc-table">
@@ -354,7 +452,12 @@ export function DocsPage() {
                   <tr>
                     <th><code>GITPAY_SAFE</code></th>
                     <td><span className="pill pill-mid">variable</span></td>
-                    <td>Your Safe address, without the <code>sep:</code> prefix.</td>
+                    <td>With a Safe: your Safe address, without the <code>sep:</code> prefix.</td>
+                  </tr>
+                  <tr>
+                    <th><code>GITPAY_PAYER</code></th>
+                    <td><span className="pill pill-mid">variable</span></td>
+                    <td>With a wallet instead: the address of the wallet that approved the delegate (Part 2b).</td>
                   </tr>
                   <tr>
                     <th><code>GITPAY_TOKEN</code></th>
@@ -423,7 +526,7 @@ export function DocsPage() {
                         </li>
                         <li>
                           On the <strong>Variables</strong> tab, choose <strong>New repository variable</strong> and add{" "}
-                          <code>GITPAY_SAFE</code> and <code>GITPAY_TOKEN</code>.
+                          <code>GITPAY_SAFE</code> (or <code>GITPAY_PAYER</code>) and <code>GITPAY_TOKEN</code>.
                         </li>
                       </ol>
                     ),
@@ -436,7 +539,8 @@ export function DocsPage() {
               />
               <Callout title="Names must match exactly">
                 The workflow reads <code>secrets.GITPAY_DELEGATE_KEY</code>, <code>secrets.GITPAY_RPC_URL</code>,{" "}
-                <code>vars.GITPAY_SAFE</code> and <code>vars.GITPAY_TOKEN</code>. GitHub stores the names in upper case.
+                <code>vars.GITPAY_SAFE</code> (or <code>vars.GITPAY_PAYER</code>) and <code>vars.GITPAY_TOKEN</code>.
+                GitHub stores the names in upper case.
               </Callout>
             </Step>
           </section>
@@ -449,7 +553,13 @@ export function DocsPage() {
               <code>mode: self</code>.
             </p>
             <Step n={1} title="Update the workflow">
-              <Code title=".github/workflows/gitpay.yml" code={LIVE} />
+              <p>Pick the tab for the account you set up in Part 2. They differ only in the account lines.</p>
+              <Tabs
+                items={[
+                  { label: "Safe", body: <Code title=".github/workflows/gitpay.yml" code={live("safe")} /> },
+                  { label: "Wallet (MetaMask…)", body: <Code title=".github/workflows/gitpay.yml" code={live("wallet")} /> },
+                ]}
+              />
             </Step>
             <Step n={2} title="Review the policy">
               <ul className="doc-list">
@@ -467,8 +577,8 @@ export function DocsPage() {
                 </li>
               </ul>
               <Callout kind="warn" title="Two limits, both needed">
-                <code>max_per_payout</code> stops one bad command. The Safe spending limit stops a leaked key. Keep the
-                spending limit at what you can afford to lose in one period.
+                <code>max_per_payout</code> stops one bad command. The Safe spending limit, or the wallet approval, stops a
+                leaked key. Keep either at what you can afford to lose.
               </Callout>
             </Step>
           </section>
@@ -484,7 +594,7 @@ export function DocsPage() {
               <Code title="PR comment" code="/send 0xRecipientAddress 1 USDC" />
               <p>
                 The run posts a receipt comment on the PR with an Etherscan link. Open it and check the USDC transfer
-                from your Safe to the recipient.
+                from your Safe, or your wallet, to the recipient. The receipt's <strong>From</strong> row says which.
               </p>
             </Step>
             <Step n={2} title="Repeat the same command">
@@ -493,22 +603,29 @@ export function DocsPage() {
                 No second transfer happens.
               </p>
             </Step>
-            <Step n={3} title="Go over the cap">
+            <Step n={3} title="Pay the same person again, on purpose">
+              <Code title="PR comment" code="/send 0xRecipientAddress 1 USDC round:1" />
+              <p>
+                A new round is a new payout, so this one settles and posts its own receipt. Use it for a genuine second
+                payment, or to retry one that never landed.
+              </p>
+            </Step>
+            <Step n={4} title="Go over the cap">
               <Code title="PR comment" code="/send 0xRecipientAddress 50 USDC" />
               <p>
                 With <code>max_per_payout: "5"</code>, the run fails with <code>AMOUNT_CAP_EXCEEDED</code> and nothing is
                 signed. A red run is the expected result here.
               </p>
             </Step>
-            <Step n={4} title="Try the kill switch">
+            <Step n={5} title="Try the kill switch">
               <p>
                 Set the variable <code>GITPAY_ENABLED</code> to <code>false</code> and send again. The run is refused
                 with <code>POLICY_DENIED</code>. Delete the variable, or set it to <code>true</code>, to resume.
               </p>
             </Step>
             <Callout kind="ok" title="What a passing setup looks like">
-              One receipt comment, one transfer on Etherscan, an <code>already-paid</code> repeat, and two refusals that
-              moved nothing.
+              Two receipt comments and two transfers on Etherscan (round 0 and round 1), an <code>already-paid</code>{" "}
+              repeat, and two refusals that moved nothing.
             </Callout>
           </section>
 
@@ -549,8 +666,19 @@ export function DocsPage() {
                   <tr>
                     <th><code>SIMULATION_REVERT</code></th>
                     <td>
-                      The Safe refused the transfer, so no gas was spent. Usually this period's spending limit is used
-                      up, the Safe has too little USDC, or the limit is for a different delegate or token.
+                      The transfer was refused in simulation, so no gas was spent. With a Safe: this period's spending
+                      limit is used up, the Safe has too little USDC, or the limit is for a different delegate or token.
+                      With a wallet: the approval is spent or was never made for this delegate, or the wallet has too
+                      little USDC. <code>no contract code</code> in the log means <code>GITPAY_TOKEN</code> is not a
+                      token on Sepolia.
+                    </td>
+                  </tr>
+                  <tr>
+                    <th><code>unconfirmed</code></th>
+                    <td>
+                      An earlier attempt recorded a transaction that GitPay could not confirm, so nothing was paid by
+                      this run. Open the transaction on Etherscan. If it succeeded, the contributor is paid. If it failed
+                      or never landed, send the command again with <code>round:1</code> (or the next round).
                     </td>
                   </tr>
                   <tr>
@@ -575,15 +703,17 @@ export function DocsPage() {
                   <tr>
                     <th><code>already-paid</code>, but you meant to pay again</th>
                     <td>
-                      A recipient is paid once per PR. To pay them again on purpose, bump the <code>round</code> input.
+                      A recipient is paid once per PR. To pay them again on purpose, add <code>round:1</code> to the
+                      command: <code>/send 0xRecipient 2.50 round:1</code>.
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <Callout kind="warn" title="If the delegate key leaks">
-              In Safe{"{"}Wallet{"}"}, delete the delegate's spending limit right away. The limit resets every period, so
-              a key left in place can keep spending.
+              With a Safe: in Safe{"{"}Wallet{"}"}, delete the delegate's spending limit right away. The limit resets
+              every period, so a key left in place can keep spending. With a wallet: from the paying wallet, call{" "}
+              <code>approve(delegate, 0)</code> on the token, or revoke it at revoke.cash.
             </Callout>
             <div className="cta-row doc-next">
               <a
