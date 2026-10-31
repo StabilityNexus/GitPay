@@ -48,6 +48,7 @@ export function Nav() {
               {label}
             </a>
           ))}
+          <a href="./docs/">Docs</a>
           <a className="btn btn-primary btn-sm" href="#start">
             Get started
           </a>

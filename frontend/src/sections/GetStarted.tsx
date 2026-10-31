@@ -60,10 +60,6 @@ const GO_LIVE = (
     <K>cancel-in-progress:</K>
     {" false   "}
     <C># never cancel mid-payout</C>
-    {"\n  "}
-    <K>queue:</K>
-    {" max                  "}
-    <C># keep every waiting /send</C>
     {"\n\n        "}
     <K>with:</K>
     {"\n          "}
@@ -111,13 +107,8 @@ export function GetStarted() {
               <a className="btn btn-primary" href="https://github.com/kpj2006/gitpay-quickstart" target="_blank" rel="noopener">
                 Open the quickstart <span className="arr" aria-hidden="true">→</span>
               </a>
-              <a
-                className="btn btn-ghost"
-                href="https://github.com/StabilityNexus/GitPay/blob/main/SETTLEMENT-FLOW.md"
-                target="_blank"
-                rel="noopener"
-              >
-                Settlement flow
+              <a className="btn btn-ghost" href="./docs/">
+                Step-by-step setup
               </a>
             </div>
           </div>
