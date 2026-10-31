@@ -34,7 +34,7 @@ jobs:
 
       - name: Detect repository languages
         id: set-matrix
-        uses: advanced-security/set-codeql-language-matrix@9f9ba17a61d34c97baaf17e96276389a0cd73392 # v1.3.0
+        uses: advanced-security/set-codeql-language-matrix@038e12c9474b0c253f122180eb943bee2e10a24a # v1.6.0
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
           endpoint: ${{ github.event.repository.languages_url }}
