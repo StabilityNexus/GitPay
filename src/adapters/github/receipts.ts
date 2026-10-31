@@ -88,7 +88,7 @@ export function formatReceipt(receipt: Receipt, context: PayoutContext = {}): st
     ...(rows.length ? ["| | |", "|---|---|", ...rows.map(([k, v]) => `| ${k} | ${v} |`), ""] : []),
     broadcasting
       ? "Written **before** broadcasting, so this transaction may not have landed yet. " +
-        "If it never does, re-run with `round` bumped to pay again deliberately — GitPay " +
+        "If it never does, send the command again with a higher `round:N` to pay deliberately — GitPay " +
         "will not decide that for you, because paying twice cannot be undone."
       : "Re-running this payout settles nothing — this receipt is its idempotency record.",
     "",

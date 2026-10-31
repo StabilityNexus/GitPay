@@ -290,7 +290,7 @@ function formatReceipt(receipt, context = {}) {
         ...(rows.length ? ["| | |", "|---|---|", ...rows.map(([k, v]) => `| ${k} | ${v} |`), ""] : []),
         broadcasting
             ? "Written **before** broadcasting, so this transaction may not have landed yet. " +
-                "If it never does, re-run with `round` bumped to pay again deliberately — GitPay " +
+                "If it never does, send the command again with a higher `round:N` to pay deliberately — GitPay " +
                 "will not decide that for you, because paying twice cannot be undone."
             : "Re-running this payout settles nothing — this receipt is its idempotency record.",
         "",
@@ -5111,7 +5111,9 @@ const SEND_LINE = /^\s*\/send\b(.*)$/;
 /** `10`, `2.5`, or `10usdc` with the symbol run onto the number. */
 const AMOUNT_WITH_ASSET = /^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z][a-zA-Z0-9]{0,11})?$/;
 const ASSET = /^[a-zA-Z][a-zA-Z0-9]{0,11}$/;
-const USAGE = "usage: `/send <recipient> <amount> [asset]` — e.g. `/send 0xabc…def 10 USDC`";
+const ROUND_TOKEN = /^round:/i;
+const ROUND = /^round:([0-9]{1,6})$/i;
+const USAGE = "usage: `/send <recipient> <amount> [asset] [round:N]` — e.g. `/send 0xabc…def 10 USDC`";
 /**
  * Finds a `/send` command anywhere in a comment body.
  *
@@ -5125,7 +5127,20 @@ function parseSendCommand(body) {
         const match = SEND_LINE.exec(line);
         if (!match)
             continue;
-        const tokens = (match[1] ?? "").trim().split(/\s+/).filter(Boolean);
+        const all = (match[1] ?? "").trim().split(/\s+/).filter(Boolean);
+        // `round:N` is the one named token, and only after the recipient and the
+        // amount, so it can never be read as either. It is how a maintainer pays
+        // the same person again on the same ref: a new round is a new idempotency
+        // key, typed on purpose, never inferred.
+        const rounds = all.slice(2).filter((t) => ROUND_TOKEN.test(t));
+        const tokens = all.filter((t, i) => i < 2 || !ROUND_TOKEN.test(t));
+        if (rounds.length > 1) {
+            throw new Error(`the round was given ${rounds.length} times. ${USAGE}`);
+        }
+        const round = rounds[0] === undefined ? undefined : ROUND.exec(rounds[0])?.[1];
+        if (rounds[0] !== undefined && round === undefined) {
+            throw new Error(`"${rounds[0]}" is not a valid round; use round:1, round:2, … ${USAGE}`);
+        }
         if (tokens.length < 2) {
             throw new Error(`\`/send\` needs a recipient and an amount. ${USAGE}`);
         }
@@ -5145,7 +5160,7 @@ function parseSendCommand(body) {
         if (asset !== undefined && !ASSET.test(asset)) {
             throw new Error(`"${asset}" is not a valid asset symbol. ${USAGE}`);
         }
-        return { recipient, amount, asset };
+        return { recipient, amount, asset, ...(round === undefined ? {} : { round }) };
     }
     return undefined;
 }
@@ -5915,7 +5930,8 @@ async function run() {
         asset,
         network,
         scheme: readInput("scheme"),
-        round: readInput("round"),
+        // A `round:N` typed in the command wins, like the recipient and amount.
+        round: command?.round ?? readInput("round"),
     });
     /**
      * L1 POLICY, offline, before anything is resolved, signed or recorded.
@@ -6000,7 +6016,7 @@ async function run() {
      * `verify()` both match on the CAIP-2 network alone, so a mismatched chain id
      * is signed without complaint and rejected only at broadcast — by which time
      * the ledger has recorded the attempt, and the payout is stuck behind
-     * `already-paid` until someone bumps `round`.
+     * `unconfirmed` until someone bumps `round`.
      */
     const chain = lookupChain(intent.network);
     const derived = (name, fallback) => {
@@ -6074,7 +6090,19 @@ async function run() {
             explorerUrl,
         },
     });
-    const ledger = withAliases(receipts, legacyKeys);
+    /**
+     * Remembers what the settlement's own lookup found, so the run can tell a
+     * settled receipt from a `broadcasting` one without asking GitHub twice. The
+     * status that matters is the one that stopped this payment, not a later read.
+     */
+    const aliased = withAliases(receipts, legacyKeys);
+    let prior;
+    const ledger = {
+        id: aliased.id,
+        lookup: async (key) => (prior = await aliased.lookup(key)),
+        record: (key, entry) => aliased.record(key, entry),
+        confirm: (key, entry) => aliased.confirm(key, entry),
+    };
     const requirements = registry.buildRequirements({ intent, target, idempotencyKey });
     const verified = await driver.verify({ x402Version: 2, scheme: intent.scheme, network: intent.network, payload: {} }, requirements);
     if (!verified.isValid) {
@@ -6082,11 +6110,30 @@ async function run() {
     }
     const response = await registry.settle({ x402Version: 2, scheme: intent.scheme, network: intent.network, payload: {} }, requirements, { idempotencyKey, ledger });
     const alreadyPaid = response.errorReason === "AUTH_ALREADY_USED";
-    console.log(alreadyPaid
-        ? `already paid — ${response.transaction ?? "no transaction recorded"}`
-        : `settled: ${response.transaction ?? "(no transaction)"}`);
+    /**
+     * A prior receipt stops a second payment either way (I8). But a receipt still
+     * at `broadcasting` was written before its broadcast and never confirmed, so
+     * nobody knows whether the transaction landed. Reporting that as `already-paid`, with a
+     * green run, would tell everyone the contributor was paid when nobody knows.
+     * It is reported as `unconfirmed` and the run fails, so a human looks.
+     */
+    const unconfirmed = alreadyPaid && prior?.status === "broadcasting";
+    console.log(unconfirmed
+        ? `unconfirmed — an earlier attempt recorded ${response.transaction ?? "no transaction"} ` +
+            "but could not confirm it, so its outcome is unknown. Nothing was paid now. Check " +
+            "it on the explorer: if it landed, the contributor is paid; if it never did, send " +
+            `the command again with round:${intent.round + 1}.`
+        : alreadyPaid
+            ? `already paid — ${response.transaction ?? "no transaction recorded"}`
+            : `settled: ${response.transaction ?? "(no transaction)"}`);
     writeOutputs({
-        STATUS: response.success ? (alreadyPaid ? "already-paid" : "settled") : "error",
+        STATUS: unconfirmed
+            ? "unconfirmed"
+            : response.success
+                ? alreadyPaid
+                    ? "already-paid"
+                    : "settled"
+                : "error",
         TX_HASH: response.transaction ?? "",
         EXPLORER_URL: explorerUrl && response.transaction
             ? `${explorerUrl.replace(/\/+$/, "")}/tx/${response.transaction}`
@@ -6094,7 +6141,7 @@ async function run() {
         IDEMPOTENCY_KEY: idempotencyKey,
         ERROR_CODE: response.success ? "" : (response.errorReason ?? ""),
     });
-    return response.success ? 0 : 1;
+    return response.success && !unconfirmed ? 0 : 1;
 }
 run().then((code) => {
     process.exitCode = code;
