@@ -290,8 +290,9 @@ function formatReceipt(receipt, context = {}) {
         ...(rows.length ? ["| | |", "|---|---|", ...rows.map(([k, v]) => `| ${k} | ${v} |`), ""] : []),
         broadcasting
             ? "Written **before** broadcasting, so this transaction may not have landed yet. " +
-                "If it never does, send the command again with a higher `round:N` to pay deliberately — GitPay " +
-                "will not decide that for you, because paying twice cannot be undone."
+                "Check it on the explorer: if it succeeded, this payout is done; if it is still pending, wait. " +
+                "Only if it failed or was dropped, send the command again with a higher `round:N` to pay " +
+                "deliberately — GitPay will not decide that for you, because paying twice cannot be undone."
             : "Re-running this payout settles nothing — this receipt is its idempotency record.",
         "",
         FOOTER,
@@ -6125,9 +6126,11 @@ async function run() {
     // "Landed" is not "paid": a reverted transaction is in a block and moved
     // nothing. Only success on the explorer means the contributor was paid.
     const tx = response.transaction ?? "no transaction";
-    const recheck = "Check it on the explorer: if it succeeded, the contributor is paid; if it failed " +
-        "(reverted) or never landed, nothing was paid, so send the command again with " +
-        `round:${intent.round + 1}.`;
+    // "Pending" is not "never landed" either: re-sending then is only safe
+    // because round N+1 would reuse the nonce, so say wait rather than rely on it.
+    const recheck = "Check it on the explorer: if it succeeded, the contributor is paid; if it is still " +
+        "pending, wait; only if it failed (reverted) or was dropped, nothing was paid, so send " +
+        `the command again with round:${intent.round + 1}.`;
     console.log(unconfirmed
         ? `unconfirmed — an earlier attempt recorded ${tx} but could not confirm it. ` +
             `Nothing was paid now. ${recheck}`

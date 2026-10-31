@@ -168,8 +168,9 @@ outputs:
       `unconfirmed` means an earlier attempt for this payout recorded a
       transaction GitPay could not confirm, so its outcome is unknown. Nothing
       was paid by this run, and the run fails so someone checks the explorer:
-      if the transaction landed, the payout is done; only if it never did,
-      re-pay with `round:N`.
+      if the transaction succeeded, the payout is done; if it is still
+      pending, wait; only if it failed (reverted) or was dropped, re-pay with
+      `round:N`.
   ERROR_CODE:
     description: "Code from the GitPay error taxonomy, empty on success."
   IDEMPOTENCY_KEY:

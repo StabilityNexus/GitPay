@@ -229,8 +229,9 @@ A `broadcasting` receipt means **outcome unknown**: the transaction may have lan
 may have died between steps 6 and 7 and nothing was sent. A later run treats it as
 `AUTH_ALREADY_USED` regardless, because paying again "to make sure" is the one unrecoverable
 mistake. Such a run reports `STATUS=unconfirmed` and fails, never a green `already-paid`. A
-human checks the hash on the explorer and, if it never landed, sends the command again with
-`round:N` (`/send <recipient> <amount> round:1`), which is a new key and a deliberate act.
+human checks the hash on the explorer: succeeded means paid, still pending means wait, and only
+failed (reverted) or dropped means sending the command again with `round:N`
+(`/send <recipient> <amount> round:1`), which is a new key and a deliberate act.
 
 ---
 
