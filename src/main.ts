@@ -15,6 +15,7 @@ import { GitPayError } from "./core/errors.js";
 import { canonical, keyFor } from "./core/idempotency.js";
 import { parseIntent } from "./core/intent.js";
 import { withAliases } from "./core/ledger.js";
+import type { LedgerEntry, SettlementLedger } from "./core/ledger.js";
 import { assertAllowed, evaluate, format } from "./core/policy.js";
 import { canonicalNetwork, lookupChain } from "./drivers/chains.js";
 import { DriverRegistry } from "./drivers/registry.js";
@@ -262,7 +263,19 @@ async function run(): Promise<number> {
       explorerUrl,
     },
   });
-  const ledger = withAliases(receipts, legacyKeys);
+  /**
+   * Remembers what the settlement's own lookup found, so the run can tell a
+   * settled receipt from a `broadcasting` one without asking GitHub twice. The
+   * status that matters is the one that stopped this payment, not a later read.
+   */
+  const aliased = withAliases(receipts, legacyKeys);
+  let prior: LedgerEntry | undefined;
+  const ledger: SettlementLedger = {
+    id: aliased.id,
+    lookup: async (key) => (prior = await aliased.lookup(key)),
+    record: (key, entry) => aliased.record(key, entry),
+    confirm: (key, entry) => aliased.confirm(key, entry),
+  };
 
   const requirements = registry.buildRequirements({ intent, target, idempotencyKey });
   const verified = await driver.verify(
@@ -284,18 +297,18 @@ async function run(): Promise<number> {
   /**
    * A prior receipt stops a second payment either way (I8). But a receipt still
    * at `broadcasting` was written before its broadcast and never confirmed, so
-   * the transaction may not exist. Reporting that as `already-paid`, with a
+   * nobody knows whether the transaction landed. Reporting that as `already-paid`, with a
    * green run, would tell everyone the contributor was paid when nobody knows.
    * It is reported as `unconfirmed` and the run fails, so a human looks.
    */
-  const unconfirmed =
-    alreadyPaid && (await ledger.lookup(idempotencyKey))?.status === "broadcasting";
+  const unconfirmed = alreadyPaid && prior?.status === "broadcasting";
 
   console.log(
     unconfirmed
       ? `unconfirmed — an earlier attempt recorded ${response.transaction ?? "no transaction"} ` +
-          "but never confirmed it. Nothing was paid now. Check it on the explorer; if it " +
-          `never landed, send the command again with round:${intent.round + 1}.`
+          "but could not confirm it, so its outcome is unknown. Nothing was paid now. Check " +
+          "it on the explorer: if it landed, the contributor is paid; if it never did, send " +
+          `the command again with round:${intent.round + 1}.`
       : alreadyPaid
         ? `already paid — ${response.transaction ?? "no transaction recorded"}`
         : `settled: ${response.transaction ?? "(no transaction)"}`,

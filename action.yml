@@ -166,8 +166,10 @@ outputs:
     description: >
       dry-run | settled | already-paid | unconfirmed | skipped | error.
       `unconfirmed` means an earlier attempt for this payout recorded a
-      transaction that never confirmed: nothing was paid by this run, and the
-      run fails so someone checks the explorer before re-paying with `round:N`.
+      transaction GitPay could not confirm, so its outcome is unknown. Nothing
+      was paid by this run, and the run fails so someone checks the explorer:
+      if the transaction landed, the payout is done; only if it never did,
+      re-pay with `round:N`.
   ERROR_CODE:
     description: "Code from the GitPay error taxonomy, empty on success."
   IDEMPOTENCY_KEY:
