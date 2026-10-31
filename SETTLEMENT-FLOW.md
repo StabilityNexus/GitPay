@@ -101,7 +101,8 @@ identical second call. While the allowance has headroom, it would transfer again
 payout has a deterministic idempotency key (repo, ref, recipient, network, asset, round; never
 the amount), and a receipt comment on the PR records it **before** the broadcast. A re-run finds
 the receipt and reports "already paid" (I8, I9). Paying the same person again on the same PR is
-a deliberate act: bump `round`.
+a deliberate act: add `round:1` to the `/send` (`/send 0xabc 10 round:1`), or bump the `round`
+input.
 
 **Serialize payouts.** A ledger lookup is check-then-act, so two runs at once could both miss.
 Put payouts in a `concurrency:` group keyed on the PR.

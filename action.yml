@@ -8,7 +8,7 @@ branding:
 inputs:
   comment:
     description: >
-      A PR comment body to read a `/send <recipient> <amount> [asset]` command from.
+      A PR comment body to read a `/send <recipient> <amount> [asset] [round:N]` command from.
       When given, the command overrides the `recipient` and `amount` inputs, and the
       amount is treated as human decimal rather than atomic units. The command cannot
       choose the token: an asset it names must match the `asset` input
@@ -69,7 +69,10 @@ inputs:
     required: false
     default: "allowance"
   round:
-    description: "Bump to deliberately re-pay the same recipient for the same ref."
+    description: >
+      Bump to deliberately re-pay the same recipient for the same ref. A
+      `round:N` typed in a `/send` command overrides it, so a maintainer can
+      re-pay from a comment without editing the workflow.
     required: false
     default: "0"
   mode:
@@ -160,7 +163,11 @@ outputs:
   EXPLORER_URL:
     description: "Human-readable link to the settlement."
   STATUS:
-    description: "dry-run | settled | already-paid | skipped | error"
+    description: >
+      dry-run | settled | already-paid | unconfirmed | skipped | error.
+      `unconfirmed` means an earlier attempt for this payout recorded a
+      transaction that never confirmed: nothing was paid by this run, and the
+      run fails so someone checks the explorer before re-paying with `round:N`.
   ERROR_CODE:
     description: "Code from the GitPay error taxonomy, empty on success."
   IDEMPOTENCY_KEY:

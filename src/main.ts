@@ -75,7 +75,8 @@ async function run(): Promise<number> {
     asset,
     network,
     scheme: input("scheme"),
-    round: input("round"),
+    // A `round:N` typed in the command wins, like the recipient and amount.
+    round: command?.round ?? input("round"),
   });
 
   /**
@@ -175,7 +176,7 @@ async function run(): Promise<number> {
    * `verify()` both match on the CAIP-2 network alone, so a mismatched chain id
    * is signed without complaint and rejected only at broadcast — by which time
    * the ledger has recorded the attempt, and the payout is stuck behind
-   * `already-paid` until someone bumps `round`.
+   * `unconfirmed` until someone bumps `round`.
    */
   const chain = lookupChain(intent.network);
 
@@ -279,14 +280,35 @@ async function run(): Promise<number> {
   );
 
   const alreadyPaid = response.errorReason === "AUTH_ALREADY_USED";
+
+  /**
+   * A prior receipt stops a second payment either way (I8). But a receipt still
+   * at `broadcasting` was written before its broadcast and never confirmed, so
+   * the transaction may not exist. Reporting that as `already-paid`, with a
+   * green run, would tell everyone the contributor was paid when nobody knows.
+   * It is reported as `unconfirmed` and the run fails, so a human looks.
+   */
+  const unconfirmed =
+    alreadyPaid && (await ledger.lookup(idempotencyKey))?.status === "broadcasting";
+
   console.log(
-    alreadyPaid
-      ? `already paid — ${response.transaction ?? "no transaction recorded"}`
-      : `settled: ${response.transaction ?? "(no transaction)"}`,
+    unconfirmed
+      ? `unconfirmed — an earlier attempt recorded ${response.transaction ?? "no transaction"} ` +
+          "but never confirmed it. Nothing was paid now. Check it on the explorer; if it " +
+          `never landed, send the command again with round:${intent.round + 1}.`
+      : alreadyPaid
+        ? `already paid — ${response.transaction ?? "no transaction recorded"}`
+        : `settled: ${response.transaction ?? "(no transaction)"}`,
   );
 
   writeOutputs({
-    STATUS: response.success ? (alreadyPaid ? "already-paid" : "settled") : "error",
+    STATUS: unconfirmed
+      ? "unconfirmed"
+      : response.success
+        ? alreadyPaid
+          ? "already-paid"
+          : "settled"
+        : "error",
     TX_HASH: response.transaction ?? "",
     EXPLORER_URL:
       explorerUrl && response.transaction
@@ -296,7 +318,7 @@ async function run(): Promise<number> {
     ERROR_CODE: response.success ? "" : (response.errorReason ?? ""),
   });
 
-  return response.success ? 0 : 1;
+  return response.success && !unconfirmed ? 0 : 1;
 }
 
 run().then(

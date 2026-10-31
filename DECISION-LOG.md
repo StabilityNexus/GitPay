@@ -714,3 +714,31 @@ and stays gated by `REFERENCES.md` §2.4.
 
 **Still open.** Live verification on Sepolia: a real `approve` payout and a replay recorded in
 `docs/VERIFIED_CHAINS.md`, as the `allowance` rail has.
+
+---
+
+## 14. ✅ DECIDED (2026-11-01) — `round:N` on `/send`, and `unconfirmed` is not `already-paid`
+
+**The gap.** A `broadcasting` receipt blocks every retry, by design (§6f, AGENTS.md "outcome
+unknown"). The way out was "a human checks the explorer and bumps `round`" — but `round` was
+only a workflow input. An adopter whose workflow passes no `round` (the common case, and the
+SocialShareButton adoption) had no way to re-pay short of a PR editing the workflow. The same
+was true of a genuine second payment to the same person on the same PR. And a retry that hit a
+`broadcasting` receipt reported a green `already-paid`, so a payout nobody could confirm read
+as a payout that happened. Raised by CodeRabbit on AOSSIE-Org/SocialShareButton#257.
+
+**The decision.**
+- `/send <recipient> <amount> [asset] [round:N]`. The round is the one named token, accepted
+  only after the recipient and amount so it can never be read as either, digits only, at most
+  once. A malformed round is refused, never dropped: dropping it would answer `already-paid` to
+  a maintainer who meant to pay again. It overrides the `round` input, like the recipient and
+  amount do. Policy is unchanged — only an allowed association can `/send` at all, so `round:N`
+  grants no power a maintainer did not already have.
+- A run whose key finds only a `broadcasting` receipt reports `STATUS=unconfirmed`, logs the
+  recorded transaction and the exact `round:N` to re-send with, and **fails**. It still pays
+  nothing (I8 holds at the registry: the response is `AUTH_ALREADY_USED`); only the reporting
+  changes. A `settled` receipt still reports `already-paid` and passes.
+
+**Not done.** Checking the recorded hash on-chain to resolve `broadcasting` automatically. It
+would need a status method on the driver interface and a rule for "unknown to the node", which
+is exactly the ambiguous case. The human check stays; this change makes it reachable.

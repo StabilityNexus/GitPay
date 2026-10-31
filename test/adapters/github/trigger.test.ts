@@ -52,6 +52,53 @@ test("refuses a command it cannot read rather than guessing", () => {
   assert.throws(() => parseSendCommand(`/send ${ADDR} 10usdc USDC`), /asset was given twice/);
 });
 
+test("round:N after the amount or the asset is a deliberate re-payment", () => {
+  assert.deepEqual(parseSendCommand(`/send ${ADDR} 10 round:1`), {
+    recipient: ADDR,
+    amount: "10",
+    asset: undefined,
+    round: "1",
+  });
+  assert.deepEqual(parseSendCommand(`/send ${ADDR} 2.5 USDC ROUND:12`), {
+    recipient: ADDR,
+    amount: "2.5",
+    asset: "USDC",
+    round: "12",
+  });
+  assert.equal(parseSendCommand(`/send ${ADDR} 10 round:2 USDC`)?.asset, "USDC", "in either order");
+});
+
+test("a mistyped round is refused, never read as round 0", () => {
+  // Silently dropping it would answer `already-paid` to a maintainer who meant
+  // to pay again — or, worse, read it as an asset or an amount.
+  assert.throws(() => parseSendCommand(`/send ${ADDR} 10 round:one`), /not a valid round/);
+  assert.throws(() => parseSendCommand(`/send ${ADDR} 10 round:`), /not a valid round/);
+  assert.throws(() => parseSendCommand(`/send ${ADDR} 10 round:-1`), /not a valid round/);
+  assert.throws(() => parseSendCommand(`/send ${ADDR} 10 round:1234567`), /not a valid round/);
+  assert.throws(() => parseSendCommand(`/send ${ADDR} 10 round:1 round:2`), /given 2 times/);
+});
+
+test("round:N cannot stand in for the recipient or the amount", () => {
+  assert.throws(() => parseSendCommand(`/send ${ADDR} round:1`), /not a valid amount/);
+  assert.equal(parseSendCommand(`/send round:1 10`)?.recipient, "round:1", "position 1 is the recipient, opaque (I4)");
+});
+
+test("a round changes the idempotency key, and only the round", () => {
+  const key = (round: number) =>
+    canonical({
+      v: 1,
+      source: { platform: "github", repo: "o/r", ref: "refs/pull/1" },
+      recipient: ADDR,
+      network: "eip155:11155111",
+      asset: "USDC",
+      round,
+    });
+  const r0 = key(0);
+  const r1 = key(Number(parseSendCommand(`/send ${ADDR} 10 round:1`)?.round));
+  assert.notEqual(r0, r1);
+  assert.equal(r0.replace(/\|0$/, "|1"), r1);
+});
+
 test("a /send with no asset pays in the workflow's asset", () => {
   assert.equal(resolveCommandAsset(undefined, "USDC"), "USDC");
   assert.equal(resolveCommandAsset(undefined, undefined), undefined);

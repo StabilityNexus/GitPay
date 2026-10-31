@@ -12,14 +12,19 @@ export interface SendCommand {
   amount: string;
   /** Asset symbol if the author named one, otherwise undefined. */
   asset: string | undefined;
+  /** `round:N` if the author typed one: a deliberate re-payment. Digits only. */
+  round?: string;
 }
 
 const SEND_LINE = /^\s*\/send\b(.*)$/;
 /** `10`, `2.5`, or `10usdc` with the symbol run onto the number. */
 const AMOUNT_WITH_ASSET = /^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z][a-zA-Z0-9]{0,11})?$/;
 const ASSET = /^[a-zA-Z][a-zA-Z0-9]{0,11}$/;
+const ROUND_TOKEN = /^round:/i;
+const ROUND = /^round:([0-9]{1,6})$/i;
 
-const USAGE = "usage: `/send <recipient> <amount> [asset]` — e.g. `/send 0xabc…def 10 USDC`";
+const USAGE =
+  "usage: `/send <recipient> <amount> [asset] [round:N]` — e.g. `/send 0xabc…def 10 USDC`";
 
 /**
  * Finds a `/send` command anywhere in a comment body.
@@ -34,7 +39,22 @@ export function parseSendCommand(body: string): SendCommand | undefined {
     const match = SEND_LINE.exec(line);
     if (!match) continue;
 
-    const tokens = (match[1] ?? "").trim().split(/\s+/).filter(Boolean);
+    const all = (match[1] ?? "").trim().split(/\s+/).filter(Boolean);
+
+    // `round:N` is the one named token, and only after the recipient and the
+    // amount, so it can never be read as either. It is how a maintainer pays
+    // the same person again on the same ref: a new round is a new idempotency
+    // key, typed on purpose, never inferred.
+    const rounds = all.slice(2).filter((t) => ROUND_TOKEN.test(t));
+    const tokens = all.filter((t, i) => i < 2 || !ROUND_TOKEN.test(t));
+    if (rounds.length > 1) {
+      throw new Error(`the round was given ${rounds.length} times. ${USAGE}`);
+    }
+    const round = rounds[0] === undefined ? undefined : ROUND.exec(rounds[0])?.[1];
+    if (rounds[0] !== undefined && round === undefined) {
+      throw new Error(`"${rounds[0]}" is not a valid round; use round:1, round:2, … ${USAGE}`);
+    }
+
     if (tokens.length < 2) {
       throw new Error(`\`/send\` needs a recipient and an amount. ${USAGE}`);
     }
@@ -63,7 +83,7 @@ export function parseSendCommand(body: string): SendCommand | undefined {
       throw new Error(`"${asset}" is not a valid asset symbol. ${USAGE}`);
     }
 
-    return { recipient, amount, asset };
+    return { recipient, amount, asset, ...(round === undefined ? {} : { round }) };
   }
 
   return undefined;

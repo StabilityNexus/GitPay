@@ -228,7 +228,9 @@ Not built: the CLI (`npx gitpay …`) — cut from the MVP (`DECISION-LOG.md` §
 A `broadcasting` receipt means **outcome unknown**: the transaction may have landed, or the run
 may have died between steps 6 and 7 and nothing was sent. A later run treats it as
 `AUTH_ALREADY_USED` regardless, because paying again "to make sure" is the one unrecoverable
-mistake. A human checks the hash on the explorer and, if it never landed, bumps `round`.
+mistake. Such a run reports `STATUS=unconfirmed` and fails, never a green `already-paid`. A
+human checks the hash on the explorer and, if it never landed, sends the command again with
+`round:N` (`/send <recipient> <amount> round:1`), which is a new key and a deliberate act.
 
 ---
 
@@ -302,7 +304,7 @@ the ledger, and on the allowance rail that means paying it again.
 
 **`amount` is excluded on purpose.** With amount in the key, `/send alice 50` corrected to
 `/send alice 500` yields two keys and Alice receives 550. Excluded, the correction collides and
-requires an explicit `round: 1` — a deliberate, logged act. A coarser key fails recoverably; a
+requires an explicit `round:1` on the `/send` (or the `round` input) — a deliberate, logged act. A coarser key fails recoverably; a
 finer key fails by paying twice. Same reasoning excludes timestamps and comment IDs.
 
 Because `asset` and `network` are in the key, **multi-asset and multi-chain payouts will work
@@ -366,7 +368,7 @@ them, and do not add the networks themselves.
 - **Untrusted comments never mark a payout as paid.** Only bot and maintainer receipts count.
 - Remaining risk, known: a run that dies after the ledger write and before broadcast leaves a
   `broadcasting` receipt for a payout that never happened. That fails toward **under**-paying —
-  the contributor is not paid until a human checks the explorer and bumps `round`. There is no
+  the contributor is not paid until a human checks the explorer and re-sends with `round:N`. There is no
   automatic repair; a double payment is the failure this ordering exists to rule out.
 
 ---
