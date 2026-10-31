@@ -5317,7 +5317,7 @@ const VALID_AFTER_SKEW_SECONDS = 60;
 const VALID_BEFORE_WINDOW_SECONDS = 900;
 
 ;// CONCATENATED MODULE: ./src/core/errors.ts
-const ERROR_CODES = (/* unused pure expression or super */ null && ([
+const ERROR_CODES = [
     "AUTH_ALREADY_USED",
     "AUTH_EXPIRED",
     "AUTH_NOT_YET_VALID",
@@ -5336,7 +5336,7 @@ const ERROR_CODES = (/* unused pure expression or super */ null && ([
     "DRIVER_NOT_FOUND",
     "TIER_VIOLATION",
     "NO_REPLAY_PROTECTION",
-]));
+];
 const ERRORS = {
     AUTH_ALREADY_USED: {
         meaning: "Authorization nonce already consumed",
@@ -6157,7 +6157,10 @@ async function run() {
 run().then((code) => {
     process.exitCode = code;
 }, (err) => {
-    const code = err instanceof GitPayError ? err.code : "";
+    // Drivers attach a code to a plain Error (`Object.assign(new Error(…), { code })`),
+    // so reading GitPayError alone left ERROR_CODE blank for every driver refusal.
+    const raw = err instanceof GitPayError ? err.code : err?.code;
+    const code = isErrorCode(raw) ? raw : "";
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
     writeOutputs({ STATUS: "error", TX_HASH: "", EXPLORER_URL: "", ERROR_CODE: code });

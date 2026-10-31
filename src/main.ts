@@ -11,7 +11,7 @@ import {
 } from "./adapters/github/trigger.js";
 import { toAtomic } from "./core/amount.js";
 import { DEFAULT_SETTLEMENT_ENABLED, parseSettlementMode } from "./core/defaults.js";
-import { GitPayError } from "./core/errors.js";
+import { GitPayError, isErrorCode } from "./core/errors.js";
 import { canonical, keyFor } from "./core/idempotency.js";
 import { parseIntent } from "./core/intent.js";
 import { withAliases } from "./core/ledger.js";
@@ -348,7 +348,10 @@ run().then(
     process.exitCode = code;
   },
   (err: unknown) => {
-    const code = err instanceof GitPayError ? err.code : "";
+    // Drivers attach a code to a plain Error (`Object.assign(new Error(…), { code })`),
+    // so reading GitPayError alone left ERROR_CODE blank for every driver refusal.
+    const raw = err instanceof GitPayError ? err.code : (err as { code?: unknown } | null)?.code;
+    const code = isErrorCode(raw) ? raw : "";
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
     writeOutputs({ STATUS: "error", TX_HASH: "", EXPLORER_URL: "", ERROR_CODE: code });
