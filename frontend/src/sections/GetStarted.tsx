@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { Reveal, useCopy } from "../components/ui";
-import { cx, usePrefersReducedMotion } from "../hooks";
+import { cx, tabKeyTarget, usePrefersReducedMotion } from "../hooks";
 
 const C = ({ children }: { children: ReactNode }) => <span className="c">{children}</span>;
 const K = ({ children }: { children: ReactNode }) => <span className="k">{children}</span>;
@@ -62,7 +62,7 @@ const GO_LIVE = (
     <C># never cancel mid-payout</C>
     {"\n  "}
     <K>queue:</K>
-    {" max                  "}
+    {" max   "}
     <C># keep every waiting /send</C>
     {"\n\n        "}
     <K>with:</K>
@@ -87,11 +87,52 @@ const GO_LIVE = (
   </>
 );
 
+/* Same job as GO_LIVE; only the account the funds leave differs. */
+const GO_LIVE_WALLET = (
+  <>
+    <C># no Safe: pay from MetaMask or any wallet that ran</C>
+    {"\n"}
+    <C># USDC.approve(delegate, amount) once. Same concurrency block.</C>
+    {"\n        "}
+    <K>with:</K>
+    {"\n          "}
+    <C># the three inputs above, plus:</C>
+    {"\n          "}
+    <K>mode:</K> <S>self</S>
+    {"\n          "}
+    <K>scheme:</K> <S>approve</S>
+    {"\n          "}
+    <K>max_per_payout:</K> <S>"5"</S>
+    {"\n          "}
+    <K>rpc_url:</K> {expr("secrets.GITPAY_RPC_URL")}
+    {"\n          "}
+    <K>payer:</K> <S>"0xYourWallet"</S>
+    {"   "}
+    <C># approved the delegate</C>
+    {"\n          "}
+    <K>token:</K> <S>"0xYourToken"</S>
+    {"\n          "}
+    <K>delegate_key:</K> {expr("secrets.GITPAY_DELEGATE_KEY")}
+    {"\n          "}
+    <K>pr:</K> {expr("github.event.issue.number")}
+    {"\n          "}
+    <K>github_token:</K> {expr("secrets.GITHUB_TOKEN")}
+  </>
+);
+
+const TABS = [
+  { label: "1 · dry run", code: DRY_RUN },
+  { label: "2 · live · Safe", code: GO_LIVE },
+  { label: "2 · live · wallet", code: GO_LIVE_WALLET },
+];
+
 export function GetStarted() {
   const reduced = usePrefersReducedMotion();
-  const [live, setLive] = useState(false);
+  const [tab, setTab] = useState(0);
   const [label, setLabel] = useState("Copy");
   const code = useRef<HTMLPreElement>(null);
+  const tabs = useRef<Array<HTMLButtonElement | null>>([]);
+  const id = useId();
   const copy = useCopy();
 
   return (
@@ -111,25 +152,38 @@ export function GetStarted() {
               <a className="btn btn-primary" href="https://github.com/kpj2006/gitpay-quickstart" target="_blank" rel="noopener">
                 Open the quickstart <span className="arr" aria-hidden="true">→</span>
               </a>
-              <a
-                className="btn btn-ghost"
-                href="https://github.com/StabilityNexus/GitPay/blob/main/SETTLEMENT-FLOW.md"
-                target="_blank"
-                rel="noopener"
-              >
-                Settlement flow
+              <a className="btn btn-ghost" href="./docs/">
+                Step-by-step setup
               </a>
             </div>
           </div>
           <div className="window">
             <div className="win-bar">
               <div className="tabs" role="tablist" aria-label="Workflow examples">
-                <button type="button" role="tab" aria-selected={!live} onClick={() => setLive(false)}>
-                  1 · dry run
-                </button>
-                <button type="button" role="tab" aria-selected={live} onClick={() => setLive(true)}>
-                  2 · go live
-                </button>
+                {TABS.map(({ label: tabLabel }, i) => (
+                  <button
+                    key={tabLabel}
+                    ref={(el) => {
+                      tabs.current[i] = el;
+                    }}
+                    type="button"
+                    role="tab"
+                    id={`${id}-t${i}`}
+                    aria-selected={tab === i}
+                    aria-controls={`${id}-panel`}
+                    tabIndex={tab === i ? 0 : -1}
+                    onClick={() => setTab(i)}
+                    onKeyDown={(e) => {
+                      const next = tabKeyTarget(e.key, tab, TABS.length);
+                      if (next === null) return;
+                      e.preventDefault();
+                      setTab(next);
+                      tabs.current[next]?.focus();
+                    }}
+                  >
+                    {tabLabel}
+                  </button>
+                ))}
               </div>
               <span className="title" />
               <button
@@ -140,8 +194,16 @@ export function GetStarted() {
                 {label}
               </button>
             </div>
-            <pre key={String(live)} ref={code} className={cx("code", !reduced && "swap")}>
-              {live ? GO_LIVE : DRY_RUN}
+            <pre
+              key={tab}
+              ref={code}
+              id={`${id}-panel`}
+              role="tabpanel"
+              aria-labelledby={`${id}-t${tab}`}
+              tabIndex={0}
+              className={cx("code", !reduced && "swap")}
+            >
+              {TABS[tab]?.code}
             </pre>
           </div>
         </Reveal>

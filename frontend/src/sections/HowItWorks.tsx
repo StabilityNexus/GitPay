@@ -78,7 +78,7 @@ const LAYERS: Layer[] = [
     id: "L3",
     name: "Authority",
     title: "The allowance, granted once",
-    body: "The Safe owners grant a spending limit to a delegate once, in Safe{Wallet}. It is capped per period on-chain and revocable at any time. No per-payout signature.",
+    body: "Granted to a delegate once, on-chain, and revocable at any time. With a Safe, a spending limit in Safe{Wallet} caps every period. With no Safe, an ordinary wallet such as MetaMask approves the delegate on the token. No per-payout signature either way.",
     code: (
       <>
         Safe{"            "}
@@ -89,6 +89,13 @@ const LAYERS: Layer[] = [
         <S>0xDelegate</S>
         {"\n       token     USDC\n       limit     "}
         <K>100 USDC / week</K> <G>// you choose</G>
+        {"\n\n"}
+        <G>// no Safe? scheme: approve</G>
+        {"\nMetaMask wallet   "}
+        <S>0xYourWallet</S>
+        {"\n  └─ USDC.approve(  "}
+        <S>0xDelegate</S>, <K>100 USDC</K>
+        {")"} <G>// tops up by hand</G>
       </>
     ),
   },
@@ -248,9 +255,12 @@ export function HowItWorks() {
         <MoneyDiagram />
         <div className="setup">
           <Spot className="card">
-            <span className="k">Once · Safe{"{Wallet}"}</span>
-            <h3>Set a spending limit</h3>
-            <p>Settings → Setup → Spending limits. Pick a delegate, the token, an amount and a reset period such as weekly.</p>
+            <span className="k">Once · Safe or wallet</span>
+            <h3>Give the delegate a limit</h3>
+            <p>
+              In Safe{"{Wallet}"}: Settings → Setup → Spending limits, with a reset period such as weekly. No Safe? From
+              MetaMask or any wallet, call <code>approve(delegate, amount)</code> on the token.
+            </p>
           </Spot>
           <Spot className="card">
             <span className="k">Once · a little test ETH</span>
@@ -260,7 +270,10 @@ export function HowItWorks() {
           <Spot className="card hl">
             <span className="k">Per payout · forever</span>
             <h3>Nothing.</h3>
-            <p>The cap refills itself each period. Maintainers comment, the workflow pays, nobody opens a wallet.</p>
+            <p>
+              Maintainers comment, the workflow pays, nobody opens a wallet. A Safe's cap refills itself each period; a
+              wallet approval is topped up when it runs out.
+            </p>
           </Spot>
         </div>
       </div>

@@ -23,7 +23,7 @@ const PROTECTIONS = [
   <>
     Default mode is <code>dry-run</code>. Real payouts need <code>mode: self</code>; an unknown mode is refused.
   </>,
-  <>Every payout is simulated first. An empty Safe or spent allowance fails for zero gas.</>,
+  <>Every payout is simulated first. An empty Safe or wallet, or a spent allowance, fails for zero gas.</>,
   <>The receipt is written before broadcast, so a crashed run can never cause a double payment.</>,
   <>Only bot and maintainer receipts count, so nobody can fake one to block a payout.</>,
 ];
@@ -51,13 +51,13 @@ export function Security() {
             <span className="warn">⚠ Stated plainly</span>
             <h3>The delegate key</h3>
             <p>
-              GitPay puts one key in your CI on purpose: the delegate the Safe's spending limit was granted to. Its
-              power is bounded on-chain and revocable.
+              GitPay puts one key in your CI on purpose: the delegate your Safe's spending limit, or your wallet's
+              approval, was granted to. Its power is bounded on-chain and revocable.
             </p>
             <p>
-              If it leaks, it can move up to the allowance each period, to any address, until a Safe owner removes it.
-              The cap resets, so losses add up. Size the cap at what you can afford to lose in one period, and revoke
-              fast.
+              With a Safe, a leaked key can move up to the allowance each period, to any address, until a Safe owner
+              removes it. The cap resets, so losses add up. With a wallet approval, it can spend what is left of the
+              approval, once. Size either at what you can afford to lose, and revoke fast.
             </p>
           </div>
           <div>

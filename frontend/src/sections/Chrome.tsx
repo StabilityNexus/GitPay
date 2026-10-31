@@ -48,6 +48,7 @@ export function Nav() {
               {label}
             </a>
           ))}
+          <a href="./docs/">Docs</a>
           <a className="btn btn-primary btn-sm" href="#start">
             Get started
           </a>
@@ -60,6 +61,7 @@ export function Nav() {
 const STACK = [
   "GitHub Actions",
   "Safe AllowanceModule v0.1.0",
+  "ERC-20 approve · any wallet",
   "Ethereum Sepolia · eip155:11155111",
   "x402 v2 data shapes",
   "@noble/curves",

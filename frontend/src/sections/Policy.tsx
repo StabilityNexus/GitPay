@@ -169,7 +169,7 @@ function Playground() {
       return {
         status: "already-paid",
         verdict: "Already paid. Reported as success.",
-        why: "The PR receipt carries this exact key, so the driver is never reached and the original transaction is reported. Change round to pay again on purpose — watch the key's last field.",
+        why: "The PR receipt carries this exact key, so the driver is never reached and the original transaction is reported. Change round to pay again on purpose (in a comment: /send … round:1) — watch the key's last field.",
         log,
       };
     }
@@ -179,7 +179,7 @@ function Playground() {
     );
     return {
       status: "settled",
-      verdict: `Paid ${amountRaw.trim()} USDC from your Safe.`,
+      verdict: `Paid ${amountRaw.trim()} USDC from your Safe or wallet.`,
       why: "Policy passed, no receipt existed, the call simulated cleanly, and the receipt was written before the broadcast.",
       log,
     };
@@ -298,7 +298,7 @@ function Playground() {
             {"\n  "}
             <span className="a">max_per_payout:</span>{" "}
             {capRaw.trim() === "" ? (
-              <span className="s"># unset: the Safe period cap is the only ceiling</span>
+              <span className="s"># unset: the on-chain allowance is the only ceiling</span>
             ) : (
               <span className="k">"{capRaw.trim()}"</span>
             )}
@@ -337,7 +337,7 @@ export function Policy() {
           <Spot className="card">
             <h3>Two ceilings, both needed</h3>
             <p>
-              <code>max_per_payout</code> stops one bad command. The Safe's period cap stops a leaked key. Neither replaces the other.
+              <code>max_per_payout</code> stops one bad command. The on-chain allowance, a Safe's period cap or a wallet's approval, stops a leaked key. Neither replaces the other.
             </p>
           </Spot>
         </div>
