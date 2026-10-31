@@ -11,7 +11,7 @@ import {
 } from "./adapters/github/trigger.js";
 import { toAtomic } from "./core/amount.js";
 import { DEFAULT_SETTLEMENT_ENABLED, parseSettlementMode } from "./core/defaults.js";
-import { GitPayError } from "./core/errors.js";
+import { GitPayError, isErrorCode } from "./core/errors.js";
 import { canonical, keyFor } from "./core/idempotency.js";
 import { parseIntent } from "./core/intent.js";
 import { withAliases } from "./core/ledger.js";
@@ -303,15 +303,24 @@ async function run(): Promise<number> {
    */
   const unconfirmed = alreadyPaid && prior?.status === "broadcasting";
 
+  // "Landed" is not "paid": a reverted transaction is in a block and moved
+  // nothing. Only success on the explorer means the contributor was paid.
+  const tx = response.transaction ?? "no transaction";
+  const recheck =
+    "Check it on the explorer: if it succeeded, the contributor is paid; if it failed " +
+    "(reverted) or never landed, nothing was paid, so send the command again with " +
+    `round:${intent.round + 1}.`;
+
   console.log(
     unconfirmed
-      ? `unconfirmed — an earlier attempt recorded ${response.transaction ?? "no transaction"} ` +
-          "but could not confirm it, so its outcome is unknown. Nothing was paid now. Check " +
-          "it on the explorer: if it landed, the contributor is paid; if it never did, send " +
-          `the command again with round:${intent.round + 1}.`
+      ? `unconfirmed — an earlier attempt recorded ${tx} but could not confirm it. ` +
+          `Nothing was paid now. ${recheck}`
       : alreadyPaid
         ? `already paid — ${response.transaction ?? "no transaction recorded"}`
-        : `settled: ${response.transaction ?? "(no transaction)"}`,
+        : response.success
+          ? `settled: ${tx}`
+          : `not settled (${response.errorReason ?? "unknown error"}) — sent ${tx} but could ` +
+            `not confirm it as a successful payout. ${recheck}`,
   );
 
   writeOutputs({
@@ -339,7 +348,10 @@ run().then(
     process.exitCode = code;
   },
   (err: unknown) => {
-    const code = err instanceof GitPayError ? err.code : "";
+    // Drivers attach a code to a plain Error (`Object.assign(new Error(…), { code })`),
+    // so reading GitPayError alone left ERROR_CODE blank for every driver refusal.
+    const raw = err instanceof GitPayError ? err.code : (err as { code?: unknown } | null)?.code;
+    const code = isErrorCode(raw) ? raw : "";
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);
     writeOutputs({ STATUS: "error", TX_HASH: "", EXPLORER_URL: "", ERROR_CODE: code });
