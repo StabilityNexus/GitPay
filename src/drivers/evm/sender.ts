@@ -171,8 +171,12 @@ export class EvmSender {
       // polled by its exact hash like the others.
       nonceTooLow = /nonce too low/i.test(message);
       if (!nonceTooLow && !/already known|known transaction/i.test(message)) {
+        // The hash is returned even though the node refused it: the ledger
+        // already records it, and it is what a human looks up to decide
+        // whether to re-pay.
         return {
           success: false,
+          transaction: prepared.reference,
           network: this.config.network,
           errorReason: classify(message),
         };

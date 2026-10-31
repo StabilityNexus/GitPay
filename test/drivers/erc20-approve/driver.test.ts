@@ -228,6 +228,21 @@ test("a spent or missing approval reverts in simulation, before anything is reco
   assert.ok(!calls.some((c) => c.method === "eth_sendRawTransaction"));
 });
 
+test("a transaction the node refuses still reports the recorded hash, so a human can look it up", async () => {
+  // No reply for eth_sendRawTransaction: the fake node answers it with an error.
+  fakeRpc({ ...HEALTHY, eth_sendRawTransaction: undefined, eth_call: "0x", eth_getCode: "0x6080" });
+  const registry = new DriverRegistry(1);
+  registry.register(driver());
+  const ledger = memoryLedger();
+
+  const response = await registry.settle(PAYLOAD, REQUIREMENTS, { idempotencyKey: "k", ledger });
+
+  assert.equal(response.success, false);
+  assert.equal(response.errorReason, "RPC_UNAVAILABLE");
+  assert.equal(response.transaction, ledger.entries.get("k")?.transaction, "the hash the receipt carries");
+  assert.equal(ledger.entries.get("k")?.status, "broadcasting", "never claimed as settled");
+});
+
 test("I9 + I8: a recorded payout is not paid again, and the rail is never touched", async () => {
   // transferFrom has no nonce, so the ledger is the only thing standing
   // between a re-run and a second transfer.

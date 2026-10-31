@@ -303,15 +303,24 @@ async function run(): Promise<number> {
    */
   const unconfirmed = alreadyPaid && prior?.status === "broadcasting";
 
+  // "Landed" is not "paid": a reverted transaction is in a block and moved
+  // nothing. Only success on the explorer means the contributor was paid.
+  const tx = response.transaction ?? "no transaction";
+  const recheck =
+    "Check it on the explorer: if it succeeded, the contributor is paid; if it failed " +
+    "(reverted) or never landed, nothing was paid, so send the command again with " +
+    `round:${intent.round + 1}.`;
+
   console.log(
     unconfirmed
-      ? `unconfirmed — an earlier attempt recorded ${response.transaction ?? "no transaction"} ` +
-          "but could not confirm it, so its outcome is unknown. Nothing was paid now. Check " +
-          "it on the explorer: if it landed, the contributor is paid; if it never did, send " +
-          `the command again with round:${intent.round + 1}.`
+      ? `unconfirmed — an earlier attempt recorded ${tx} but could not confirm it. ` +
+          `Nothing was paid now. ${recheck}`
       : alreadyPaid
         ? `already paid — ${response.transaction ?? "no transaction recorded"}`
-        : `settled: ${response.transaction ?? "(no transaction)"}`,
+        : response.success
+          ? `settled: ${tx}`
+          : `not settled (${response.errorReason ?? "unknown error"}) — sent ${tx} but could ` +
+            `not confirm it as a successful payout. ${recheck}`,
   );
 
   writeOutputs({
