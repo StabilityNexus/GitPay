@@ -306,10 +306,12 @@ async function run(): Promise<number> {
   // "Landed" is not "paid": a reverted transaction is in a block and moved
   // nothing. Only success on the explorer means the contributor was paid.
   const tx = response.transaction ?? "no transaction";
+  // "Pending" is not "never landed" either: re-sending then is only safe
+  // because round N+1 would reuse the nonce, so say wait rather than rely on it.
   const recheck =
-    "Check it on the explorer: if it succeeded, the contributor is paid; if it failed " +
-    "(reverted) or never landed, nothing was paid, so send the command again with " +
-    `round:${intent.round + 1}.`;
+    "Check it on the explorer: if it succeeded, the contributor is paid; if it is still " +
+    "pending, wait; only if it failed (reverted) or was dropped, nothing was paid, so send " +
+    `the command again with round:${intent.round + 1}.`;
 
   console.log(
     unconfirmed

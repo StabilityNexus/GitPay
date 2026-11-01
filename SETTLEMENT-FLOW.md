@@ -105,7 +105,9 @@ the receipt and pays nothing again (I8, I9). What it reports depends on the rece
 - `settled`: the transaction confirmed. The run reports `already-paid` and passes.
 - `broadcasting`: the receipt was written before the broadcast and never confirmed, so the
   outcome is unknown. The run reports `unconfirmed` and **fails**. Check the hash on the
-  explorer: if it landed, the contributor is paid; only if it never did, re-pay.
+  explorer. If it succeeded, the contributor is paid. If it is still pending, wait. Only if it
+  failed (reverted) or was dropped, re-pay. A reverted transaction is in a block too, so
+  "landed" is not the test: only success means paid.
 
 Paying the same person again on the same PR is a deliberate act: add `round:1` to the `/send`
 (`/send 0xabc 10 round:1`), or bump the `round` input.
