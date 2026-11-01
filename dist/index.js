@@ -4777,16 +4777,20 @@ function toMinimalBytes(value) {
         hex = `0${hex}`;
     return rlp_hexToBytes(`0x${hex}`);
 }
+/**
+ * Errors name the problem, never the input: one caller passes the delegate's
+ * private key. And every character is checked, because `parseInt("0g", 16)` is
+ * 0 — a typo would otherwise become a different value instead of an error.
+ */
 function rlp_hexToBytes(hex) {
     const body = hex.startsWith("0x") ? hex.slice(2) : hex;
     if (body.length % 2 !== 0)
-        throw new Error(`odd-length hex: "${hex}"`);
+        throw new Error(`odd-length hex (${body.length} digits)`);
+    if (!/^[0-9a-fA-F]*$/.test(body))
+        throw new Error("not hex");
     const out = new Uint8Array(body.length / 2);
     for (let i = 0; i < out.length; i += 1) {
-        const byte = Number.parseInt(body.slice(i * 2, i * 2 + 2), 16);
-        if (Number.isNaN(byte))
-            throw new Error(`not hex: "${hex}"`);
-        out[i] = byte;
+        out[i] = Number.parseInt(body.slice(i * 2, i * 2 + 2), 16);
     }
     return out;
 }
@@ -4849,11 +4853,22 @@ function signingHash(tx) {
     typed.set(payload, 1);
     return keccak_256(typed);
 }
-function signTransaction(tx, privateKey) {
-    const key = rlp_hexToBytes(privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`);
-    if (key.length !== 32) {
-        throw new Error(`private key must be 32 bytes, got ${key.length}`);
+const PRIVATE_KEY = /^(?:0x)?[0-9a-fA-F]{64}$/;
+/**
+ * The key as bytes, or an error that never contains it. Errors reach the run
+ * log, which is public on a public repository, and GitHub masks a value only if
+ * it was registered as a secret.
+ */
+function privateKeyBytes(privateKey) {
+    const value = privateKey.trim();
+    if (!PRIVATE_KEY.test(value)) {
+        throw new Error("private key must be 32 bytes, written as 64 hex digits with an optional 0x prefix " +
+            "(the value is not shown)");
     }
+    return rlp_hexToBytes(value.startsWith("0x") ? value : `0x${value}`);
+}
+function signTransaction(tx, privateKey) {
+    const key = privateKeyBytes(privateKey);
     const signature = secp256k1.sign(signingHash(tx), key);
     const signed = rlpEncode([
         ...fields(tx),
@@ -4870,7 +4885,7 @@ function signTransaction(tx, privateKey) {
 }
 /** The address a private key controls — used to read the right account nonce. */
 function addressFromPrivateKey(privateKey) {
-    const key = rlp_hexToBytes(privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`);
+    const key = privateKeyBytes(privateKey);
     const uncompressed = secp256k1.getPublicKey(key, false).slice(1);
     return rlp_bytesToHex(keccak_256(uncompressed).slice(-20));
 }

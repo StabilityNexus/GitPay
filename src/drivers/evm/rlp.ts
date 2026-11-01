@@ -16,14 +16,18 @@ export function toMinimalBytes(value: bigint): Uint8Array {
   return hexToBytes(`0x${hex}`);
 }
 
+/**
+ * Errors name the problem, never the input: one caller passes the delegate's
+ * private key. And every character is checked, because `parseInt("0g", 16)` is
+ * 0 — a typo would otherwise become a different value instead of an error.
+ */
 export function hexToBytes(hex: string): Uint8Array {
   const body = hex.startsWith("0x") ? hex.slice(2) : hex;
-  if (body.length % 2 !== 0) throw new Error(`odd-length hex: "${hex}"`);
+  if (body.length % 2 !== 0) throw new Error(`odd-length hex (${body.length} digits)`);
+  if (!/^[0-9a-fA-F]*$/.test(body)) throw new Error("not hex");
   const out = new Uint8Array(body.length / 2);
   for (let i = 0; i < out.length; i += 1) {
-    const byte = Number.parseInt(body.slice(i * 2, i * 2 + 2), 16);
-    if (Number.isNaN(byte)) throw new Error(`not hex: "${hex}"`);
-    out[i] = byte;
+    out[i] = Number.parseInt(body.slice(i * 2, i * 2 + 2), 16);
   }
   return out;
 }

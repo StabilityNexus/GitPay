@@ -102,3 +102,19 @@ test("the signing hash is 32 bytes and excludes the signature", () => {
 test("rejects a key that is not 32 bytes", () => {
   assert.throws(() => signTransaction(TX, "0xabcd"), /must be 32 bytes/);
 });
+
+test("a malformed key is refused without being echoed into the log", () => {
+  // Errors reach the Actions log, public on a public repository.
+  const typo = `${KEY.slice(0, -1)}g`;
+  for (const bad of [typo, KEY.slice(0, -1), `${KEY}00`]) {
+    for (const use of [() => signTransaction(TX, bad), () => addressFromPrivateKey(bad)]) {
+      assert.throws(use, (err: Error) => /must be 32 bytes/.test(err.message) && !err.message.includes(bad.slice(2, 20)));
+    }
+  }
+});
+
+test("hex parsing refuses a partly-hex byte instead of reading its prefix", () => {
+  // parseInt("0g", 16) is 0, which used to turn a typo into a different value.
+  assert.throws(() => hexToBytes("0x0g"), /not hex/);
+  assert.throws(() => hexToBytes("0xzz"), (err: Error) => !err.message.includes("zz"));
+});
