@@ -69,7 +69,7 @@ const STACK = [
   "CAIP-2 networks",
   "EIP-1559 signing",
   "OpenSSF Scorecard",
-  "MIT licensed",
+  "GPL-3.0 licensed",
 ];
 
 export function Marquee() {
@@ -93,8 +93,9 @@ export function Footer() {
   return (
     <div className="wrap">
       <footer>
-        <span>GitPay, formerly XOps · an AOSSIE / Stability Nexus project · MIT</span>
+        <span>GitPay, formerly XOps · an AOSSIE / Stability Nexus project · GPL-3.0</span>
         <span>
+          <a href="./terms/">Terms of Use</a> ·{" "}
           <a href="https://github.com/StabilityNexus/GitPay" target="_blank" rel="noopener">
             github.com/StabilityNexus/GitPay
           </a>

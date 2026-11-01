@@ -1,3 +1,4 @@
+import { TermsGate } from "./components/TermsGate";
 import { Background, Footer, Marquee, Nav } from "./sections/Chrome";
 import { Flexibility } from "./sections/Flexibility";
 import { GetStarted } from "./sections/GetStarted";
@@ -23,6 +24,7 @@ export function App() {
         <GetStarted />
         <Footer />
       </main>
+      <TermsGate termsHref="./terms/" />
     </>
   );
 }

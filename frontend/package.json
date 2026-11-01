@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "GitPay marketing site. Static React app deployed to GitHub Pages; not part of the Action.",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"

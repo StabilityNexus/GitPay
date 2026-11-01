@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "description": "CI/CD-native value transfer engine. A repository event produces a payment intent, declared policy approves it, the workflow settles it from your Safe.",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "type": "module",
   "engines": {
     "node": ">=20"
