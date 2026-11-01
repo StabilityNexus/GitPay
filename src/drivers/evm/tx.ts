@@ -55,11 +55,26 @@ export interface SignedTransaction {
   hash: string;
 }
 
-export function signTransaction(tx: Eip1559Transaction, privateKey: string): SignedTransaction {
-  const key = hexToBytes(privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`);
-  if (key.length !== 32) {
-    throw new Error(`private key must be 32 bytes, got ${key.length}`);
+const PRIVATE_KEY = /^(?:0x)?[0-9a-fA-F]{64}$/;
+
+/**
+ * The key as bytes, or an error that never contains it. Errors reach the run
+ * log, which is public on a public repository, and GitHub masks a value only if
+ * it was registered as a secret.
+ */
+function privateKeyBytes(privateKey: string): Uint8Array {
+  const value = privateKey.trim();
+  if (!PRIVATE_KEY.test(value)) {
+    throw new Error(
+      "private key must be 32 bytes, written as 64 hex digits with an optional 0x prefix " +
+        "(the value is not shown)",
+    );
   }
+  return hexToBytes(value.startsWith("0x") ? value : `0x${value}`);
+}
+
+export function signTransaction(tx: Eip1559Transaction, privateKey: string): SignedTransaction {
+  const key = privateKeyBytes(privateKey);
 
   const signature = secp256k1.sign(signingHash(tx), key);
 
@@ -81,7 +96,7 @@ export function signTransaction(tx: Eip1559Transaction, privateKey: string): Sig
 
 /** The address a private key controls — used to read the right account nonce. */
 export function addressFromPrivateKey(privateKey: string): string {
-  const key = hexToBytes(privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`);
+  const key = privateKeyBytes(privateKey);
   const uncompressed = secp256k1.getPublicKey(key, false).slice(1);
   return bytesToHex(keccak_256(uncompressed).slice(-20));
 }

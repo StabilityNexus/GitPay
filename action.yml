@@ -35,7 +35,9 @@ inputs:
       `refs/pull/<number>` does.
     required: false
   actor:
-    description: "Overrides GITHUB_ACTOR in the intent source."
+    description: >
+      Overrides GITHUB_ACTOR in the intent source. It never decides who may spend:
+      a `/send` author's write access is checked against GITHUB_ACTOR itself.
     required: false
   recipient:
     description: "Opaque payout identity. An inline address, or anything a resolver understands."
@@ -93,7 +95,10 @@ inputs:
   allowed_associations:
     description: >
       Comma-separated GitHub author_association values permitted to spend via
-      `/send`, e.g. "OWNER,MEMBER". Applies only to comment-triggered runs — a
+      `/send`, e.g. "OWNER,MEMBER". An author it admits other than OWNER must
+      also have write access to the repository, checked with `github_token`,
+      because MEMBER means any member of the owning organization. Applies only
+      to comment-triggered runs — a
       workflow-configured payout needs no comment author, because editing the
       workflow already requires write access. An unrecognized value warns and is
       kept: a typo can only narrow the allowlist, never widen it.
@@ -154,8 +159,12 @@ inputs:
     description: "Pull request number whose comments hold the payout receipts."
     required: false
   github_token:
-    description: "Token used to read and write the receipt comment."
+    description: >
+      Token used to read and write the receipt comment, and to confirm that a
+      `/send` author other than the owner can push to the repository. Defaults
+      to the workflow's own token.
     required: false
+    default: "${{ github.token }}"
 
 outputs:
   TX_HASH:

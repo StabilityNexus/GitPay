@@ -3,6 +3,7 @@ import { writeOutputs } from "./adapters/github/outputs.js";
 import { PullRequestReceiptLedger } from "./adapters/github/receipts.js";
 import { ERC20_APPROVE_SCHEME, Erc20ApproveDriver } from "./drivers/erc20-approve/driver.js";
 import { SAFE_ALLOWANCE_SCHEME, SafeAllowanceDriver } from "./drivers/safe-allowance/driver.js";
+import { maySpend } from "./adapters/github/permissions.js";
 import {
   isMaintainer,
   parseAssociations,
@@ -95,21 +96,45 @@ async function run(): Promise<number> {
    * resolution also means an outsider cannot make the runner do work.
    */
   const maxPerPayout = input("max_per_payout");
+  const enabled = (input("enabled") ?? String(DEFAULT_SETTLEMENT_ENABLED)) !== "false";
+
+  /**
+   * undefined, not false, when nothing was typed into a comment: this run was
+   * configured by a workflow, and editing one already needs write access.
+   *
+   * The allowlist matches `author_association`, which does not say whether the
+   * author can push here — `MEMBER` is any org member — so anyone it admits
+   * short of OWNER is checked against the repository's permissions too.
+   *
+   * The account checked is GITHUB_ACTOR, the one that posted the comment, never
+   * the `actor` input: an override is presentation, and must not lend its
+   * permissions to someone else's `/send`. An outsider is refused before the
+   * lookup, and with the kill switch off there is no lookup at all, so neither
+   * can make the runner do work or turn a policy refusal into an API error.
+   */
+  const association = input("actor_association");
+  const allowed = parseAssociations(input("allowed_associations"));
+  const actorIsMaintainer =
+    command === undefined
+      ? undefined
+      : enabled
+        ? await maySpend(association, allowed, {
+            repo: intent.source.platform === "github" ? intent.source.repo : intent.source.project,
+            login: process.env["GITHUB_ACTOR"] ?? "",
+            token: input("github_token") ?? "",
+          })
+        : isMaintainer(association, allowed);
+
   const decision = evaluate(
     {
-      enabled: (input("enabled") ?? String(DEFAULT_SETTLEMENT_ENABLED)) !== "false",
+      enabled,
       // Typed as the maintainer thinks of it, in the same units as `/send`, and
       // converted with the asset's decimals. A cap written in atomic units next
       // to a `/send 2.50` would be read wrong by exactly the person it protects.
       maxPerPayout: maxPerPayout === undefined ? undefined : toAtomic(maxPerPayout, decimals),
     },
     {
-      // undefined, not false, when nothing was typed into a comment: this run
-      // was configured by a workflow, and editing one already needs write access.
-      actorIsMaintainer:
-        command === undefined
-          ? undefined
-          : isMaintainer(input("actor_association"), parseAssociations(input("allowed_associations"))),
+      actorIsMaintainer,
       amount: intent.amount,
     },
   );
