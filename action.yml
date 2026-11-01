@@ -35,7 +35,9 @@ inputs:
       `refs/pull/<number>` does.
     required: false
   actor:
-    description: "Overrides GITHUB_ACTOR in the intent source."
+    description: >
+      Overrides GITHUB_ACTOR in the intent source. It never decides who may spend:
+      a `/send` author's write access is checked against GITHUB_ACTOR itself.
     required: false
   recipient:
     description: "Opaque payout identity. An inline address, or anything a resolver understands."

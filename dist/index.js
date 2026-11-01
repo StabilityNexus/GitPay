@@ -378,6 +378,9 @@ const WRITE_PERMISSIONS = new Set(["admin", "write"]);
  * caller deciding about money refuses rather than guesses.
  */
 async function hasWriteAccess(ref, fetchImpl = fetch) {
+    if (!ref.login) {
+        throw new Error(`Cannot check who may spend on ${ref.repo}: the commenting account is unknown`);
+    }
     if (!ref.token) {
         throw new Error(`Checking that ${ref.login} can push to ${ref.repo} needs the "github_token" input`);
     }
@@ -605,23 +608,26 @@ class PullRequestReceiptLedger {
     }
     async lookup(key) {
         const writers = new Map();
+        const unvouched = [];
         for (let page = 1; page <= 20; page += 1) {
             const batch = await githubJson(`${this.base()}?per_page=100&page=${page}`, this.ref.token);
-            const found = findReceipt(await this.vouched(batch, key, writers), key);
+            const found = findReceipt(await this.vouched(batch, key, writers, unvouched), key);
             if (found)
                 return found;
             if (batch.length < 100)
-                return undefined;
+                return this.refuseUnvouched(key, unvouched);
         }
         // Bailing out silently would mean paying twice on a very long thread.
         throw new Error(`Could not scan all comments on ${this.ref.repo}#${this.ref.number} for a receipt; refusing to settle`);
     }
     /**
-     * Drops receipts for `key` whose human author cannot push here. Only matching
-     * receipts are looked up, and GitPay's own come from a bot, so a normal run
-     * makes no extra call. A failed lookup throws, refusing the payout.
+     * Keeps the receipts for `key` that can be believed, and names in
+     * `unvouched` the human authors of ones that cannot: a MEMBER or
+     * COLLABORATOR who cannot push here now. Only matching receipts are
+     * looked up, and GitPay's own come from a bot, so a normal run makes no
+     * extra call. A failed lookup throws, refusing the payout.
      */
-    async vouched(batch, key, writers) {
+    async vouched(batch, key, writers, unvouched) {
         const kept = [];
         for (const comment of batch) {
             const recorded = parseReceiptKey(comment.body ?? "");
@@ -632,17 +638,32 @@ class PullRequestReceiptLedger {
                 kept.push(comment);
                 continue;
             }
-            const login = comment.user?.login;
-            if (!login)
-                continue;
-            if (!writers.has(login)) {
+            const login = comment.user?.login ?? "";
+            if (login && !writers.has(login)) {
                 const { repo, token, apiBase } = this.ref;
                 writers.set(login, hasWriteAccess({ repo, login, token, ...(apiBase ? { apiBase } : {}) }));
             }
-            if (await writers.get(login))
+            if (login && (await writers.get(login)))
                 kept.push(comment);
+            else
+                unvouched.push(login || "an unknown account");
         }
         return kept;
+    }
+    /**
+     * A receipt nobody can vouch for is neither believed nor ignored. Believing
+     * it would let a forger mark a payout paid; ignoring it would pay again if it
+     * was genuine — written through a person's token by someone who has since
+     * lost access. So the run stops and says which comment a human must judge.
+     */
+    refuseUnvouched(key, unvouched) {
+        if (unvouched.length === 0)
+            return undefined;
+        throw new Error(`A receipt for ${key} on ${this.ref.repo}#${this.ref.number} was posted by ` +
+            `${[...new Set(unvouched)].join(", ")}, who cannot push to the repository now. ` +
+            "Refusing to settle: it may be forged, or it may record a real payout. Check its " +
+            "transaction on the explorer; delete the comment if it is forged, or re-pay " +
+            "deliberately with round:N.");
     }
     async post(key, entry) {
         return fetch(this.base(), {
@@ -6054,28 +6075,40 @@ async function run() {
      * resolution also means an outsider cannot make the runner do work.
      */
     const maxPerPayout = readInput("max_per_payout");
+    const enabled = (readInput("enabled") ?? String(DEFAULT_SETTLEMENT_ENABLED)) !== "false";
+    /**
+     * undefined, not false, when nothing was typed into a comment: this run was
+     * configured by a workflow, and editing one already needs write access.
+     *
+     * The allowlist matches `author_association`, which does not say whether the
+     * author can push here — `MEMBER` is any org member — so anyone it admits
+     * short of OWNER is checked against the repository's permissions too.
+     *
+     * The account checked is GITHUB_ACTOR, the one that posted the comment, never
+     * the `actor` input: an override is presentation, and must not lend its
+     * permissions to someone else's `/send`. An outsider is refused before the
+     * lookup, and with the kill switch off there is no lookup at all, so neither
+     * can make the runner do work or turn a policy refusal into an API error.
+     */
+    const association = readInput("actor_association");
+    const allowed = parseAssociations(readInput("allowed_associations"));
+    const actorIsMaintainer = command === undefined
+        ? undefined
+        : enabled
+            ? await maySpend(association, allowed, {
+                repo: intent.source.platform === "github" ? intent.source.repo : intent.source.project,
+                login: process.env["GITHUB_ACTOR"] ?? "",
+                token: readInput("github_token") ?? "",
+            })
+            : isMaintainer(association, allowed);
     const decision = evaluate({
-        enabled: (readInput("enabled") ?? String(DEFAULT_SETTLEMENT_ENABLED)) !== "false",
+        enabled,
         // Typed as the maintainer thinks of it, in the same units as `/send`, and
         // converted with the asset's decimals. A cap written in atomic units next
         // to a `/send 2.50` would be read wrong by exactly the person it protects.
         maxPerPayout: maxPerPayout === undefined ? undefined : toAtomic(maxPerPayout, decimals),
     }, {
-        // undefined, not false, when nothing was typed into a comment: this run
-        // was configured by a workflow, and editing one already needs write access.
-        //
-        // The allowlist matches `author_association`, which does not say whether
-        // the author can push here — `MEMBER` is any org member — so anyone it
-        // admits short of OWNER is checked against the repository's permissions
-        // too. An outsider is refused before that lookup, so cannot make the
-        // runner do work.
-        actorIsMaintainer: command === undefined
-            ? undefined
-            : await maySpend(readInput("actor_association"), parseAssociations(readInput("allowed_associations")), {
-                repo: intent.source.platform === "github" ? intent.source.repo : intent.source.project,
-                login: intent.source.actor,
-                token: readInput("github_token") ?? "",
-            }),
+        actorIsMaintainer,
         amount: intent.amount,
     });
     console.log("policy:");

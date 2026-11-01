@@ -108,7 +108,11 @@ test("a malformed key is refused without being echoed into the log", () => {
   const typo = `${KEY.slice(0, -1)}g`;
   for (const bad of [typo, KEY.slice(0, -1), `${KEY}00`]) {
     for (const use of [() => signTransaction(TX, bad), () => addressFromPrivateKey(bad)]) {
-      assert.throws(use, (err: Error) => /must be 32 bytes/.test(err.message) && !err.message.includes(bad.slice(2, 20)));
+      assert.throws(use, {
+        message:
+          "private key must be 32 bytes, written as 64 hex digits with an optional 0x prefix " +
+          "(the value is not shown)",
+      });
     }
   }
 });

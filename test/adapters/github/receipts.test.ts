@@ -179,12 +179,25 @@ afterEach(() => {
 const ledger = () => new PullRequestReceiptLedger({ repo: "kpj2006/demo-XOps", number: 1, token: "t" });
 const receipt = formatReceipt({ key: KEY, status: "settled", transaction: "0xabc" });
 
-test("an org member who cannot push cannot block a payout with a forged receipt", async () => {
+test("a receipt from a member who cannot push is neither believed nor ignored", async () => {
+  // Believed, a forger could mark a payout paid; ignored, a genuine receipt from
+  // someone who has since lost access would let the payout settle twice.
   const looked = fakeGitHub([{ body: receipt, author_association: "MEMBER", user: { login: "mallory" } }], {
     mallory: "read",
   });
-  assert.equal(await ledger().lookup(KEY), undefined);
+  await assert.rejects(ledger().lookup(KEY), /posted by mallory, who cannot push to the repository now/);
   assert.deepEqual(looked, ["mallory"]);
+});
+
+test("an unvouched receipt does not stop a payout a bot receipt already records", async () => {
+  fakeGitHub(
+    [
+      { body: receipt, author_association: "MEMBER", user: { login: "mallory" } },
+      { body: receipt, ...BOT },
+    ],
+    { mallory: "read" },
+  );
+  assert.equal((await ledger().lookup(KEY))?.transaction, "0xabc");
 });
 
 test("a receipt from a member who can push is still believed", async () => {

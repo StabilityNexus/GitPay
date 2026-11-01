@@ -33,7 +33,7 @@
     },
     "actor": {
       "type": "string",
-      "description": "Overrides GITHUB_ACTOR in the intent source."
+      "description": "Overrides GITHUB_ACTOR in the intent source. It never decides who may spend: a `/send` author's write access is checked against GITHUB_ACTOR itself."
     },
     "recipient": {
       "type": "string",

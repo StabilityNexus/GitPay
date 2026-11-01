@@ -227,11 +227,12 @@ export class PullRequestReceiptLedger implements SettlementLedger {
 
   async lookup(key: string): Promise<LedgerEntry | undefined> {
     const writers = new Map<string, Promise<boolean>>();
+    const unvouched: string[] = [];
     for (let page = 1; page <= 20; page += 1) {
       const batch = await githubJson(`${this.base()}?per_page=100&page=${page}`, this.ref.token);
-      const found = findReceipt(await this.vouched(batch, key, writers), key);
+      const found = findReceipt(await this.vouched(batch, key, writers, unvouched), key);
       if (found) return found;
-      if (batch.length < 100) return undefined;
+      if (batch.length < 100) return this.refuseUnvouched(key, unvouched);
     }
     // Bailing out silently would mean paying twice on a very long thread.
     throw new Error(
@@ -240,14 +241,17 @@ export class PullRequestReceiptLedger implements SettlementLedger {
   }
 
   /**
-   * Drops receipts for `key` whose human author cannot push here. Only matching
-   * receipts are looked up, and GitPay's own come from a bot, so a normal run
-   * makes no extra call. A failed lookup throws, refusing the payout.
+   * Keeps the receipts for `key` that can be believed, and names in
+   * `unvouched` the human authors of ones that cannot: a MEMBER or
+   * COLLABORATOR who cannot push here now. Only matching receipts are
+   * looked up, and GitPay's own come from a bot, so a normal run makes no
+   * extra call. A failed lookup throws, refusing the payout.
    */
   private async vouched(
     batch: readonly CommentLike[],
     key: string,
     writers: Map<string, Promise<boolean>>,
+    unvouched: string[],
   ): Promise<CommentLike[]> {
     const kept: CommentLike[] = [];
     for (const comment of batch) {
@@ -259,15 +263,32 @@ export class PullRequestReceiptLedger implements SettlementLedger {
         kept.push(comment);
         continue;
       }
-      const login = comment.user?.login;
-      if (!login) continue;
-      if (!writers.has(login)) {
+      const login = comment.user?.login ?? "";
+      if (login && !writers.has(login)) {
         const { repo, token, apiBase } = this.ref;
         writers.set(login, hasWriteAccess({ repo, login, token, ...(apiBase ? { apiBase } : {}) }));
       }
-      if (await writers.get(login)) kept.push(comment);
+      if (login && (await writers.get(login))) kept.push(comment);
+      else unvouched.push(login || "an unknown account");
     }
     return kept;
+  }
+
+  /**
+   * A receipt nobody can vouch for is neither believed nor ignored. Believing
+   * it would let a forger mark a payout paid; ignoring it would pay again if it
+   * was genuine — written through a person's token by someone who has since
+   * lost access. So the run stops and says which comment a human must judge.
+   */
+  private refuseUnvouched(key: string, unvouched: readonly string[]): undefined {
+    if (unvouched.length === 0) return undefined;
+    throw new Error(
+      `A receipt for ${key} on ${this.ref.repo}#${this.ref.number} was posted by ` +
+        `${[...new Set(unvouched)].join(", ")}, who cannot push to the repository now. ` +
+        "Refusing to settle: it may be forged, or it may record a real payout. Check its " +
+        "transaction on the explorer; delete the comment if it is forged, or re-pay " +
+        "deliberately with round:N.",
+    );
   }
 
   private async post(key: string, entry: LedgerEntry): Promise<Response> {

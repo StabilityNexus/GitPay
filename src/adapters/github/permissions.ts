@@ -33,6 +33,9 @@ const WRITE_PERMISSIONS = new Set(["admin", "write"]);
  * caller deciding about money refuses rather than guesses.
  */
 export async function hasWriteAccess(ref: PermissionRef, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  if (!ref.login) {
+    throw new Error(`Cannot check who may spend on ${ref.repo}: the commenting account is unknown`);
+  }
   if (!ref.token) {
     throw new Error(`Checking that ${ref.login} can push to ${ref.repo} needs the "github_token" input`);
   }
