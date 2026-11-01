@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Background } from "../sections/Chrome";
+import { TermsGate } from "../components/TermsGate";
 import { cx } from "../hooks";
 import { Callout, Code, Path, Step, Tabs } from "./blocks";
 
@@ -744,6 +745,7 @@ export function DocsPage() {
           <footer>
             <span>GitPay · an AOSSIE / Stability Nexus project · GPL-3.0</span>
             <span>
+              <a href="../terms/">Terms of Use</a> ·{" "}
               <a href="https://github.com/StabilityNexus/GitPay/issues" target="_blank" rel="noopener">
                 Report a problem with these docs
               </a>
@@ -751,6 +753,7 @@ export function DocsPage() {
           </footer>
         </main>
       </div>
+      <TermsGate termsHref="../terms/" />
     </>
   );
 }

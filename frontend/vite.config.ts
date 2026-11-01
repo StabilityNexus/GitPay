@@ -8,10 +8,11 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      // Two pages: the landing page, and the setup guide served at /docs/.
+      // Three pages: the landing page, the setup guide at /docs/, and the Terms of Use at /terms/.
       input: {
         main: "index.html",
         docs: "docs/index.html",
+        terms: "terms/index.html",
       },
     },
   },

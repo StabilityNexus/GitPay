@@ -95,6 +95,7 @@ export function Footer() {
       <footer>
         <span>GitPay, formerly XOps · an AOSSIE / Stability Nexus project · GPL-3.0</span>
         <span>
+          <a href="./terms/">Terms of Use</a> ·{" "}
           <a href="https://github.com/StabilityNexus/GitPay" target="_blank" rel="noopener">
             github.com/StabilityNexus/GitPay
           </a>
