@@ -342,3 +342,6 @@ demo-XOps/
 # Windows' null device is not a path in Git Bash, so `> nul` or
 # `GITHUB_OUTPUT=nul` silently creates a real file full of test output.
 nul
+
+# Security-review reports with open findings. Never commit; security-remediation publishes them.
+unremediated-security-reviews/
