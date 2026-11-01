@@ -85,7 +85,7 @@
       "type": "string",
       "pattern": "^\\s*[A-Za-z_]+(\\s*,\\s*[A-Za-z_]+)*\\s*$",
       "default": "OWNER,MEMBER,COLLABORATOR",
-      "description": "Comma-separated author_association values permitted to spend via `/send`."
+      "description": "Comma-separated author_association values permitted to spend via `/send`. An author it admits other than OWNER must also have write access to the repository, checked with `github_token`."
     },
     "max_per_payout": {
       "type": "string",
@@ -139,7 +139,8 @@
     },
     "github_token": {
       "type": "string",
-      "description": "Token used to read and write the receipt comment. Needed when mode is `self`."
+      "default": "${{ github.token }}",
+      "description": "Token used to read and write the receipt comment, and to confirm that a `/send` author other than the owner can push to the repository. Defaults to the workflow's own token."
     }
   }
 }

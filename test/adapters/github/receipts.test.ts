@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { afterEach, test } from "node:test";
 
 import {
   findReceipt,
   formatReceipt,
   isTrustedReceiptAuthor,
   parseReceiptKey,
+  PullRequestReceiptLedger,
 } from "../../../src/adapters/github/receipts.js";
 
 const KEY = "xops:v1|github:kpj2006/demo-XOps#refs/pull/1|0xdead|eip155:11155111|USDC|0";
@@ -145,4 +146,60 @@ test("an old receipt in one asset casing is found by a retry in another", () => 
   assert.equal(findReceipt(comments, KEY)?.transaction, "0xabc");
   assert.equal(findReceipt(comments, KEY.replace("|USDC|", "|usdc|"))?.transaction, "0xabc");
   assert.equal(findReceipt(comments, KEY.replace("|USDC|", "|DAI|")), undefined, "another asset is another payout");
+});
+
+// --- The ledger: an association alone does not make a receipt believable ---
+
+/**
+ * A fake GitHub: the PR's comments, and each login's repository permission.
+ * Records every permission lookup.
+ */
+function fakeGitHub(comments: unknown[], permissions: Record<string, string>): string[] {
+  const looked: string[] = [];
+  globalThis.fetch = ((url: unknown) => {
+    const path = String(url);
+    const login = /\/collaborators\/([^/]+)\/permission$/.exec(path)?.[1];
+    if (login === undefined) return Promise.resolve(new Response(JSON.stringify(comments)));
+    looked.push(decodeURIComponent(login));
+    const permission = permissions[decodeURIComponent(login)];
+    return Promise.resolve(
+      permission === undefined
+        ? new Response("{}", { status: 404 })
+        : new Response(JSON.stringify({ permission })),
+    );
+  }) as typeof fetch;
+  return looked;
+}
+
+const realFetch = globalThis.fetch;
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
+
+const ledger = () => new PullRequestReceiptLedger({ repo: "kpj2006/demo-XOps", number: 1, token: "t" });
+const receipt = formatReceipt({ key: KEY, status: "settled", transaction: "0xabc" });
+
+test("an org member who cannot push cannot block a payout with a forged receipt", async () => {
+  const looked = fakeGitHub([{ body: receipt, author_association: "MEMBER", user: { login: "mallory" } }], {
+    mallory: "read",
+  });
+  assert.equal(await ledger().lookup(KEY), undefined);
+  assert.deepEqual(looked, ["mallory"]);
+});
+
+test("a receipt from a member who can push is still believed", async () => {
+  fakeGitHub([{ body: receipt, author_association: "COLLABORATOR", user: { login: "alice" } }], { alice: "write" });
+  assert.equal((await ledger().lookup(KEY))?.transaction, "0xabc");
+});
+
+test("GitPay's own bot receipts and unrelated comments cost no permission lookup", async () => {
+  const looked = fakeGitHub(
+    [
+      { body: "lgtm", author_association: "MEMBER", user: { login: "bob" } },
+      { body: receipt, ...BOT },
+    ],
+    {},
+  );
+  assert.equal((await ledger().lookup(KEY))?.status, "settled");
+  assert.deepEqual(looked, []);
 });

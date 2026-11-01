@@ -214,7 +214,211 @@ function keyFor(intent) {
     };
 }
 
+;// CONCATENATED MODULE: ./src/adapters/github/trigger.ts
+const SEND_LINE = /^\s*\/send\b(.*)$/;
+/** `10`, `2.5`, or `10usdc` with the symbol run onto the number. */
+const AMOUNT_WITH_ASSET = /^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z][a-zA-Z0-9]{0,11})?$/;
+const ASSET = /^[a-zA-Z][a-zA-Z0-9]{0,11}$/;
+const ROUND_TOKEN = /^round:/i;
+const ROUND = /^round:([0-9]{1,6})$/i;
+const USAGE = "usage: `/send <recipient> <amount> [asset] [round:N]` — e.g. `/send 0xabc…def 10 USDC`";
+/**
+ * Finds a `/send` command anywhere in a comment body.
+ *
+ * Returns `undefined` when the comment simply isn't a command — that is the
+ * common case and not an error. Throws only when a line *is* a `/send` but
+ * cannot be read, because silently misreading an amount is far worse than
+ * refusing it.
+ */
+function parseSendCommand(body) {
+    for (const line of body.split(/\r?\n/)) {
+        const match = SEND_LINE.exec(line);
+        if (!match)
+            continue;
+        const all = (match[1] ?? "").trim().split(/\s+/).filter(Boolean);
+        // `round:N` is the one named token, and only after the recipient and the
+        // amount, so it can never be read as either. It is how a maintainer pays
+        // the same person again on the same ref: a new round is a new idempotency
+        // key, typed on purpose, never inferred.
+        const rounds = all.slice(2).filter((t) => ROUND_TOKEN.test(t));
+        const tokens = all.filter((t, i) => i < 2 || !ROUND_TOKEN.test(t));
+        if (rounds.length > 1) {
+            throw new Error(`the round was given ${rounds.length} times. ${USAGE}`);
+        }
+        const round = rounds[0] === undefined ? undefined : ROUND.exec(rounds[0])?.[1];
+        if (rounds[0] !== undefined && round === undefined) {
+            throw new Error(`"${rounds[0]}" is not a valid round; use round:1, round:2, … ${USAGE}`);
+        }
+        if (tokens.length < 2) {
+            throw new Error(`\`/send\` needs a recipient and an amount. ${USAGE}`);
+        }
+        if (tokens.length > 3) {
+            throw new Error(`\`/send\` got ${tokens.length} arguments and expected at most 3. ${USAGE}`);
+        }
+        const [recipient, second, third] = tokens;
+        const amountMatch = AMOUNT_WITH_ASSET.exec(second);
+        if (!amountMatch) {
+            throw new Error(`"${second}" is not a valid amount. ${USAGE}`);
+        }
+        const [, amount, attachedAsset] = amountMatch;
+        if (attachedAsset && third) {
+            throw new Error(`the asset was given twice, as "${attachedAsset}" and "${third}". ${USAGE}`);
+        }
+        const asset = attachedAsset ?? third;
+        if (asset !== undefined && !ASSET.test(asset)) {
+            throw new Error(`"${asset}" is not a valid asset symbol. ${USAGE}`);
+        }
+        return { recipient, amount, asset, ...(round === undefined ? {} : { round }) };
+    }
+    return undefined;
+}
+/**
+ * Reconciles the asset a `/send` names with the one the workflow pays in, and
+ * returns the workflow's spelling.
+ *
+ * A `/send` cannot choose the token: the driver always pays the workflow's
+ * `token` input. So an asset word that disagrees with the workflow is refused
+ * rather than recorded — `/send 0xabc 25 DAI` on a USDC workflow would
+ * otherwise pay 25 USDC under a receipt that says DAI.
+ *
+ * The workflow's spelling, not the typed one, is what reaches the idempotency
+ * key. `asset` is a key field, so `USDC`, `usdc` and `Usdc` kept as typed would
+ * be three keys for one payout, and the same person could be paid three times
+ * on one PR with no `round` bump. Matching is case-insensitive for that reason:
+ * the symbol is a label for the configured token, never a second token.
+ *
+ * A named asset with no configured one is refused too, because there is then
+ * nothing to check it against.
+ */
+function resolveCommandAsset(named, configured) {
+    if (named === undefined)
+        return configured;
+    if (configured === undefined) {
+        throw new Error(`\`/send\` names "${named}", but this workflow sets no \`asset\` input to check it ` +
+            "against. Set `asset` to the symbol of the `token` the workflow pays in.");
+    }
+    if (named.toLowerCase() !== configured.toLowerCase()) {
+        throw new Error(`\`/send\` names "${named}", but this workflow pays in ${configured}. A \`/send\` ` +
+            `cannot choose the token. Name ${configured}, or leave the asset out. ${USAGE}`);
+    }
+    return configured;
+}
+/**
+ * Author associations GitHub reports for people who can be trusted to spend the
+ * project's money. Everything else — CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR, NONE —
+ * is denied by default, so a drive-by commenter cannot trigger a payout to
+ * themselves.
+ *
+ * Which associations qualify is the adopter's call, so it is configurable. What
+ * an association *means* stays here rather than in core policy: `author_association`
+ * is a GitHub concept, and core is told only whether the actor may spend.
+ */
+const DEFAULT_MAINTAINER_ASSOCIATIONS = ["OWNER", "MEMBER", "COLLABORATOR"];
+/** Every value GitHub documents for `author_association`. Used to catch typos. */
+const KNOWN_ASSOCIATIONS = new Set([
+    "OWNER",
+    "MEMBER",
+    "COLLABORATOR",
+    "CONTRIBUTOR",
+    "FIRST_TIME_CONTRIBUTOR",
+    "FIRST_TIMER",
+    "MANNEQUIN",
+    "NONE",
+]);
+/**
+ * Reads the configured allowlist, e.g. `OWNER,MEMBER`.
+ *
+ * An unrecognized entry **warns and is kept** rather than failing the run. A
+ * typo can only ever narrow an allowlist — `OWNERS` matches nobody — so the
+ * consequence is a denied payout, never an unintended one. Failing outright
+ * would instead break every run the day GitHub adds an association value.
+ *
+ * An empty or blank list falls back to the default. Reading it as "allow
+ * nobody" would be defensible, but a blank input is far more likely to be an
+ * unset repository variable than a deliberate lockout, and silently disabling
+ * `/send` is a bad way to find that out — the kill switch exists to say that
+ * on purpose.
+ */
+function parseAssociations(raw) {
+    const entries = (raw ?? "")
+        .split(",")
+        .map((entry) => entry.trim().toUpperCase())
+        .filter(Boolean);
+    if (entries.length === 0)
+        return [...DEFAULT_MAINTAINER_ASSOCIATIONS];
+    for (const entry of entries) {
+        if (!KNOWN_ASSOCIATIONS.has(entry)) {
+            console.warn(`allowed_associations lists "${entry}", which is not a GitHub author_association. ` +
+                `It will match nobody. Known values: ${[...KNOWN_ASSOCIATIONS].join(", ")}.`);
+        }
+    }
+    return entries;
+}
+/**
+ * L1 POLICY input, evaluated offline. Returns a fact for `core/policy.ts` to
+ * judge rather than throwing here, so one place decides what a denial means and
+ * the result table can report this condition alongside the others.
+ */
+function isMaintainer(association, allowed) {
+    const value = (association ?? "").trim().toUpperCase();
+    return value.length > 0 && allowed.includes(value);
+}
+
+;// CONCATENATED MODULE: ./src/adapters/github/permissions.ts
+
+/**
+ * The organization's or account's owner. GitHub gives an owner admin on every
+ * repository it owns, so no lookup can say otherwise.
+ */
+const IMPLIES_WRITE = "OWNER";
+/** `permission` already folds `maintain` into `write` and `triage` into `read`. */
+const WRITE_PERMISSIONS = new Set(["admin", "write"]);
+/**
+ * Whether `login` can push to `repo`. Throws when GitHub cannot answer, so a
+ * caller deciding about money refuses rather than guesses.
+ */
+async function hasWriteAccess(ref, fetchImpl = fetch) {
+    if (!ref.token) {
+        throw new Error(`Checking that ${ref.login} can push to ${ref.repo} needs the "github_token" input`);
+    }
+    const api = ref.apiBase ?? "https://api.github.com";
+    const url = `${api}/repos/${ref.repo}/collaborators/${encodeURIComponent(ref.login)}/permission`;
+    const response = await fetchImpl(url, {
+        headers: {
+            accept: "application/vnd.github+json",
+            authorization: `Bearer ${ref.token}`,
+            "x-github-api-version": "2022-11-28",
+            "user-agent": "gitpay",
+        },
+    });
+    // Not a collaborator at all — an org member with no access here, for one.
+    if (response.status === 404)
+        return false;
+    if (!response.ok) {
+        throw new Error(`GitHub API ${response.status} checking ${ref.login}'s permission on ${ref.repo}`);
+    }
+    const { permission } = (await response.json());
+    return WRITE_PERMISSIONS.has(permission ?? "");
+}
+/**
+ * The spend check for a comment author: on the allowlist, AND able to push.
+ * The second half only narrows the first, so an adopter's allowlist keeps
+ * meaning what it said; it just cannot grant more than write access does.
+ */
+async function maySpend(association, allowed, ref, fetchImpl = fetch) {
+    if (!isMaintainer(association, allowed))
+        return false;
+    if (associationImpliesWrite(association?.trim()))
+        return true;
+    return hasWriteAccess(ref, fetchImpl);
+}
+/** For a receipt author who passed the association check: OWNER needs no lookup. */
+function associationImpliesWrite(association) {
+    return (association ?? "").toUpperCase() === IMPLIES_WRITE;
+}
+
 ;// CONCATENATED MODULE: ./src/adapters/github/receipts.ts
+
 
 /**
  * The PR conversation is the ledger.
@@ -322,6 +526,9 @@ function parseReceiptKey(body) {
  * A forged receipt withholds a payment rather than causing one, so this is
  * griefing protection rather than theft protection — but a contributor should
  * not be able to block someone else's payout with a comment.
+ *
+ * This is the offline half. `MEMBER` and `COLLABORATOR` do not imply write
+ * access, so the ledger also confirms it with GitHub before believing one.
  */
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 function isTrustedReceiptAuthor(comment) {
@@ -397,9 +604,10 @@ class PullRequestReceiptLedger {
         return `${api}/repos/${this.ref.repo}/issues/${this.ref.number}/comments`;
     }
     async lookup(key) {
+        const writers = new Map();
         for (let page = 1; page <= 20; page += 1) {
             const batch = await githubJson(`${this.base()}?per_page=100&page=${page}`, this.ref.token);
-            const found = findReceipt(batch, key);
+            const found = findReceipt(await this.vouched(batch, key, writers), key);
             if (found)
                 return found;
             if (batch.length < 100)
@@ -407,6 +615,34 @@ class PullRequestReceiptLedger {
         }
         // Bailing out silently would mean paying twice on a very long thread.
         throw new Error(`Could not scan all comments on ${this.ref.repo}#${this.ref.number} for a receipt; refusing to settle`);
+    }
+    /**
+     * Drops receipts for `key` whose human author cannot push here. Only matching
+     * receipts are looked up, and GitPay's own come from a bot, so a normal run
+     * makes no extra call. A failed lookup throws, refusing the payout.
+     */
+    async vouched(batch, key, writers) {
+        const kept = [];
+        for (const comment of batch) {
+            const recorded = parseReceiptKey(comment.body ?? "");
+            if (recorded === undefined || !sameKey(recorded, key) || !isTrustedReceiptAuthor(comment)) {
+                continue;
+            }
+            if (comment.user?.type === "Bot" || associationImpliesWrite(comment.author_association)) {
+                kept.push(comment);
+                continue;
+            }
+            const login = comment.user?.login;
+            if (!login)
+                continue;
+            if (!writers.has(login)) {
+                const { repo, token, apiBase } = this.ref;
+                writers.set(login, hasWriteAccess({ repo, login, token, ...(apiBase ? { apiBase } : {}) }));
+            }
+            if (await writers.get(login))
+                kept.push(comment);
+        }
+        return kept;
     }
     async post(key, entry) {
         return fetch(this.base(), {
@@ -5110,156 +5346,6 @@ class SafeAllowanceDriver {
     }
 }
 
-;// CONCATENATED MODULE: ./src/adapters/github/trigger.ts
-const SEND_LINE = /^\s*\/send\b(.*)$/;
-/** `10`, `2.5`, or `10usdc` with the symbol run onto the number. */
-const AMOUNT_WITH_ASSET = /^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z][a-zA-Z0-9]{0,11})?$/;
-const ASSET = /^[a-zA-Z][a-zA-Z0-9]{0,11}$/;
-const ROUND_TOKEN = /^round:/i;
-const ROUND = /^round:([0-9]{1,6})$/i;
-const USAGE = "usage: `/send <recipient> <amount> [asset] [round:N]` — e.g. `/send 0xabc…def 10 USDC`";
-/**
- * Finds a `/send` command anywhere in a comment body.
- *
- * Returns `undefined` when the comment simply isn't a command — that is the
- * common case and not an error. Throws only when a line *is* a `/send` but
- * cannot be read, because silently misreading an amount is far worse than
- * refusing it.
- */
-function parseSendCommand(body) {
-    for (const line of body.split(/\r?\n/)) {
-        const match = SEND_LINE.exec(line);
-        if (!match)
-            continue;
-        const all = (match[1] ?? "").trim().split(/\s+/).filter(Boolean);
-        // `round:N` is the one named token, and only after the recipient and the
-        // amount, so it can never be read as either. It is how a maintainer pays
-        // the same person again on the same ref: a new round is a new idempotency
-        // key, typed on purpose, never inferred.
-        const rounds = all.slice(2).filter((t) => ROUND_TOKEN.test(t));
-        const tokens = all.filter((t, i) => i < 2 || !ROUND_TOKEN.test(t));
-        if (rounds.length > 1) {
-            throw new Error(`the round was given ${rounds.length} times. ${USAGE}`);
-        }
-        const round = rounds[0] === undefined ? undefined : ROUND.exec(rounds[0])?.[1];
-        if (rounds[0] !== undefined && round === undefined) {
-            throw new Error(`"${rounds[0]}" is not a valid round; use round:1, round:2, … ${USAGE}`);
-        }
-        if (tokens.length < 2) {
-            throw new Error(`\`/send\` needs a recipient and an amount. ${USAGE}`);
-        }
-        if (tokens.length > 3) {
-            throw new Error(`\`/send\` got ${tokens.length} arguments and expected at most 3. ${USAGE}`);
-        }
-        const [recipient, second, third] = tokens;
-        const amountMatch = AMOUNT_WITH_ASSET.exec(second);
-        if (!amountMatch) {
-            throw new Error(`"${second}" is not a valid amount. ${USAGE}`);
-        }
-        const [, amount, attachedAsset] = amountMatch;
-        if (attachedAsset && third) {
-            throw new Error(`the asset was given twice, as "${attachedAsset}" and "${third}". ${USAGE}`);
-        }
-        const asset = attachedAsset ?? third;
-        if (asset !== undefined && !ASSET.test(asset)) {
-            throw new Error(`"${asset}" is not a valid asset symbol. ${USAGE}`);
-        }
-        return { recipient, amount, asset, ...(round === undefined ? {} : { round }) };
-    }
-    return undefined;
-}
-/**
- * Reconciles the asset a `/send` names with the one the workflow pays in, and
- * returns the workflow's spelling.
- *
- * A `/send` cannot choose the token: the driver always pays the workflow's
- * `token` input. So an asset word that disagrees with the workflow is refused
- * rather than recorded — `/send 0xabc 25 DAI` on a USDC workflow would
- * otherwise pay 25 USDC under a receipt that says DAI.
- *
- * The workflow's spelling, not the typed one, is what reaches the idempotency
- * key. `asset` is a key field, so `USDC`, `usdc` and `Usdc` kept as typed would
- * be three keys for one payout, and the same person could be paid three times
- * on one PR with no `round` bump. Matching is case-insensitive for that reason:
- * the symbol is a label for the configured token, never a second token.
- *
- * A named asset with no configured one is refused too, because there is then
- * nothing to check it against.
- */
-function resolveCommandAsset(named, configured) {
-    if (named === undefined)
-        return configured;
-    if (configured === undefined) {
-        throw new Error(`\`/send\` names "${named}", but this workflow sets no \`asset\` input to check it ` +
-            "against. Set `asset` to the symbol of the `token` the workflow pays in.");
-    }
-    if (named.toLowerCase() !== configured.toLowerCase()) {
-        throw new Error(`\`/send\` names "${named}", but this workflow pays in ${configured}. A \`/send\` ` +
-            `cannot choose the token. Name ${configured}, or leave the asset out. ${USAGE}`);
-    }
-    return configured;
-}
-/**
- * Author associations GitHub reports for people who can be trusted to spend the
- * project's money. Everything else — CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR, NONE —
- * is denied by default, so a drive-by commenter cannot trigger a payout to
- * themselves.
- *
- * Which associations qualify is the adopter's call, so it is configurable. What
- * an association *means* stays here rather than in core policy: `author_association`
- * is a GitHub concept, and core is told only whether the actor may spend.
- */
-const DEFAULT_MAINTAINER_ASSOCIATIONS = ["OWNER", "MEMBER", "COLLABORATOR"];
-/** Every value GitHub documents for `author_association`. Used to catch typos. */
-const KNOWN_ASSOCIATIONS = new Set([
-    "OWNER",
-    "MEMBER",
-    "COLLABORATOR",
-    "CONTRIBUTOR",
-    "FIRST_TIME_CONTRIBUTOR",
-    "FIRST_TIMER",
-    "MANNEQUIN",
-    "NONE",
-]);
-/**
- * Reads the configured allowlist, e.g. `OWNER,MEMBER`.
- *
- * An unrecognized entry **warns and is kept** rather than failing the run. A
- * typo can only ever narrow an allowlist — `OWNERS` matches nobody — so the
- * consequence is a denied payout, never an unintended one. Failing outright
- * would instead break every run the day GitHub adds an association value.
- *
- * An empty or blank list falls back to the default. Reading it as "allow
- * nobody" would be defensible, but a blank input is far more likely to be an
- * unset repository variable than a deliberate lockout, and silently disabling
- * `/send` is a bad way to find that out — the kill switch exists to say that
- * on purpose.
- */
-function parseAssociations(raw) {
-    const entries = (raw ?? "")
-        .split(",")
-        .map((entry) => entry.trim().toUpperCase())
-        .filter(Boolean);
-    if (entries.length === 0)
-        return [...DEFAULT_MAINTAINER_ASSOCIATIONS];
-    for (const entry of entries) {
-        if (!KNOWN_ASSOCIATIONS.has(entry)) {
-            console.warn(`allowed_associations lists "${entry}", which is not a GitHub author_association. ` +
-                `It will match nobody. Known values: ${[...KNOWN_ASSOCIATIONS].join(", ")}.`);
-        }
-    }
-    return entries;
-}
-/**
- * L1 POLICY input, evaluated offline. Returns a fact for `core/policy.ts` to
- * judge rather than throwing here, so one place decides what a denial means and
- * the result table can report this condition alongside the others.
- */
-function isMaintainer(association, allowed) {
-    const value = (association ?? "").trim().toUpperCase();
-    return value.length > 0 && allowed.includes(value);
-}
-
 ;// CONCATENATED MODULE: ./src/core/amount.ts
 // Human amounts in, atomic units out. Pure string arithmetic — floats are not
 // allowed anywhere near money, and `parseFloat("0.1")` is exactly why.
@@ -5890,6 +5976,7 @@ class ResolverChain {
 
 
 
+
 async function run() {
     // First, before anything is parsed or resolved: an unknown mode is refused
     // rather than read as "not dry-run", which would settle on a typo (I5).
@@ -5961,9 +6048,19 @@ async function run() {
     }, {
         // undefined, not false, when nothing was typed into a comment: this run
         // was configured by a workflow, and editing one already needs write access.
+        //
+        // The allowlist matches `author_association`, which does not say whether
+        // the author can push here — `MEMBER` is any org member — so anyone it
+        // admits short of OWNER is checked against the repository's permissions
+        // too. An outsider is refused before that lookup, so cannot make the
+        // runner do work.
         actorIsMaintainer: command === undefined
             ? undefined
-            : isMaintainer(readInput("actor_association"), parseAssociations(readInput("allowed_associations"))),
+            : await maySpend(readInput("actor_association"), parseAssociations(readInput("allowed_associations")), {
+                repo: intent.source.platform === "github" ? intent.source.repo : intent.source.project,
+                login: intent.source.actor,
+                token: readInput("github_token") ?? "",
+            }),
         amount: intent.amount,
     });
     console.log("policy:");

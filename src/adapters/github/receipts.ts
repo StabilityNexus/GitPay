@@ -1,5 +1,6 @@
 import { sameKey } from "../../core/idempotency.js";
 import type { LedgerEntry, PayoutContext, SettlementLedger } from "../../core/ledger.js";
+import { associationImpliesWrite, hasWriteAccess } from "./permissions.js";
 
 /**
  * The PR conversation is the ledger.
@@ -128,6 +129,9 @@ export interface CommentLike {
  * A forged receipt withholds a payment rather than causing one, so this is
  * griefing protection rather than theft protection — but a contributor should
  * not be able to block someone else's payout with a comment.
+ *
+ * This is the offline half. `MEMBER` and `COLLABORATOR` do not imply write
+ * access, so the ledger also confirms it with GitHub before believing one.
  */
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 
@@ -222,9 +226,10 @@ export class PullRequestReceiptLedger implements SettlementLedger {
   }
 
   async lookup(key: string): Promise<LedgerEntry | undefined> {
+    const writers = new Map<string, Promise<boolean>>();
     for (let page = 1; page <= 20; page += 1) {
       const batch = await githubJson(`${this.base()}?per_page=100&page=${page}`, this.ref.token);
-      const found = findReceipt(batch, key);
+      const found = findReceipt(await this.vouched(batch, key, writers), key);
       if (found) return found;
       if (batch.length < 100) return undefined;
     }
@@ -232,6 +237,37 @@ export class PullRequestReceiptLedger implements SettlementLedger {
     throw new Error(
       `Could not scan all comments on ${this.ref.repo}#${this.ref.number} for a receipt; refusing to settle`,
     );
+  }
+
+  /**
+   * Drops receipts for `key` whose human author cannot push here. Only matching
+   * receipts are looked up, and GitPay's own come from a bot, so a normal run
+   * makes no extra call. A failed lookup throws, refusing the payout.
+   */
+  private async vouched(
+    batch: readonly CommentLike[],
+    key: string,
+    writers: Map<string, Promise<boolean>>,
+  ): Promise<CommentLike[]> {
+    const kept: CommentLike[] = [];
+    for (const comment of batch) {
+      const recorded = parseReceiptKey(comment.body ?? "");
+      if (recorded === undefined || !sameKey(recorded, key) || !isTrustedReceiptAuthor(comment)) {
+        continue;
+      }
+      if (comment.user?.type === "Bot" || associationImpliesWrite(comment.author_association)) {
+        kept.push(comment);
+        continue;
+      }
+      const login = comment.user?.login;
+      if (!login) continue;
+      if (!writers.has(login)) {
+        const { repo, token, apiBase } = this.ref;
+        writers.set(login, hasWriteAccess({ repo, login, token, ...(apiBase ? { apiBase } : {}) }));
+      }
+      if (await writers.get(login)) kept.push(comment);
+    }
+    return kept;
   }
 
   private async post(key: string, entry: LedgerEntry): Promise<Response> {

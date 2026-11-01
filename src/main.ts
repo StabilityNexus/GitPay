@@ -3,8 +3,8 @@ import { writeOutputs } from "./adapters/github/outputs.js";
 import { PullRequestReceiptLedger } from "./adapters/github/receipts.js";
 import { ERC20_APPROVE_SCHEME, Erc20ApproveDriver } from "./drivers/erc20-approve/driver.js";
 import { SAFE_ALLOWANCE_SCHEME, SafeAllowanceDriver } from "./drivers/safe-allowance/driver.js";
+import { maySpend } from "./adapters/github/permissions.js";
 import {
-  isMaintainer,
   parseAssociations,
   parseSendCommand,
   resolveCommandAsset,
@@ -106,10 +106,25 @@ async function run(): Promise<number> {
     {
       // undefined, not false, when nothing was typed into a comment: this run
       // was configured by a workflow, and editing one already needs write access.
+      //
+      // The allowlist matches `author_association`, which does not say whether
+      // the author can push here — `MEMBER` is any org member — so anyone it
+      // admits short of OWNER is checked against the repository's permissions
+      // too. An outsider is refused before that lookup, so cannot make the
+      // runner do work.
       actorIsMaintainer:
         command === undefined
           ? undefined
-          : isMaintainer(input("actor_association"), parseAssociations(input("allowed_associations"))),
+          : await maySpend(
+              input("actor_association"),
+              parseAssociations(input("allowed_associations")),
+              {
+                repo:
+                  intent.source.platform === "github" ? intent.source.repo : intent.source.project,
+                login: intent.source.actor,
+                token: input("github_token") ?? "",
+              },
+            ),
       amount: intent.amount,
     },
   );
