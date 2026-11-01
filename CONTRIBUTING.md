@@ -1,4 +1,4 @@
-# Contributing to GitPay
+# Contributing to TODO: Project Name
 
 ⭐ First off, thank you for considering contributing to this project! ⭐
 
@@ -9,7 +9,7 @@ We welcome contributions from everyone. By participating in this project, you ag
 **All project communication MUST happen on Discord. We do not pay attention to GitHub notifications.**
 
 - Join our [Discord server](https://discord.gg/hjUhu33uAn) before starting any work
-- GitPay's channel is [#gitpay](https://discord.com/channels/1022871757289422898/1458764598562783323) — post your PR/issue updates there (**MANDATORY**)
+- Post your PR/issue updates in the relevant Discord channel (**MANDATORY**)
 - All discussions, questions, and updates should be on Discord
 - GitHub is for code only - Discord is for communication
 
@@ -68,11 +68,7 @@ What we expect:
 
 ### Prerequisites
 
-- Node.js ≥ 20
-- npm
-
-No accounts, secrets, or wallets are needed — everything defaults to `mode: dry-run` and the
-checks run fully offline.
+TODO: List prerequisites specific to your project
 
 ### Setup
 
@@ -83,23 +79,25 @@ checks run fully offline.
 
 2. **Clone Your Fork**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/GitPay.git
-   cd GitPay
+   git clone https://github.com/YOUR_USERNAME/TODO.git
+   cd TODO
    ```
 
 3. **Add Upstream Remote**
    ```bash
-   git remote add upstream https://github.com/StabilityNexus/GitPay.git
+   git remote add upstream https://github.com/AOSSIE-Org/TODO.git
    ```
 
 4. **Install Dependencies**
    ```bash
    npm install
+   # or yarn install
+   # or pnpm install
    ```
 
-5. **Run the Checks**
+5. **Run the Project**
    ```bash
-   npm run check
+   npm run dev
    ```
 
 ## 🔄 Development Workflow
@@ -123,21 +121,13 @@ git checkout -b fix/your-bug-fix
 
 ### 3. Test Your Changes
 
-```bash
-npm run check   # lint + layer-boundary check + dependency-count check + tests
-# or individually:
-npm run lint
-npm test
-npm run check:boundary
-npm run check:deps
-```
+TODO: Add project-specific testing instructions
 
-**Tests are required.** A PR that adds or changes behaviour must add or update tests in `test/`
-that would fail without the change. A bug fix includes a test that reproduces the bug. Anything
-on the payment path (policy, idempotency, the ledger, encoding and signing) needs a test for each
-refusal as well as the success path, and a change to transaction encoding needs its golden vector
-in `test/vectors/` regenerated deliberately with an independent implementation. PRs without tests
-for new behaviour are not merged.
+```bash
+npm test
+# or
+npm run lint
+```
 
 ### 4. Commit Your Changes
 
@@ -220,7 +210,7 @@ Steps to test the changes
 
 ### After Submission
 
-- Post your PR in [GitPay's Discord channel](https://discord.com/channels/1022871757289422898/1458764598562783323) for visibility (**IMPORTANT**)
+- Post your PR in the project's Discord channel for visibility(**IMPORTANT**)
 - Respond to review comments promptly
 - Make requested changes in new commits
 - Be patient - maintainers will review when available
@@ -233,9 +223,7 @@ Steps to test the changes
 
 ## 📝 Code Style Guidelines
 
-See [AGENTS.md](./AGENTS.md) for the project's authoritative, non-negotiable rules — the layer
-boundary between `src/core`/`src/adapters` and the drivers, the dependency-count cap, and the
-idempotency conventions. CI enforces these on every push.
+TODO: Add project-specific code style guidelines
 
 ### General Guidelines
 
@@ -246,11 +234,16 @@ idempotency conventions. CI enforces these on every push.
 - Avoid code duplication
 - Avoid unnecessary complexity and minor over-optimization
 
-### TypeScript
+### JavaScript/TypeScript
 - Use ES6+ syntax
 - Prefer `const` over `let`, avoid `var`
 - Use arrow functions where appropriate
 - Follow ESLint rules
+
+### Python
+- Follow PEP 8 style guide
+- Use type hints where applicable
+- Write docstrings for functions/classes
 
 ## 🔧 Debugging Pre-commit Hooks
 
@@ -506,7 +499,7 @@ If you encounter issues not covered here:
 
 1. Check [pre-commit documentation](https://pre-commit.com/)
 2. Review the error message carefully (it usually tells you what's wrong)
-3. Ask in [GitPay's Discord channel](https://discord.com/channels/1022871757289422898/1458764598562783323)
+3. Ask in the project's Discord channel
 4. Search for similar issues in the repository
 
 **Remember:** Pre-commit hooks are there to help you maintain code quality. Don't fight them - fix the issues they find!
@@ -545,4 +538,4 @@ If you encounter issues not covered here:
 - Check for existing PRs before starting to avoid duplication, as there might PRs that didn't mention the related issue
 
 
-Thank you for contributing to GitPay! Your efforts help make this project better for everyone. 🚀
+Thank you for contributing to TODO! Your efforts help make this project better for everyone. 🚀

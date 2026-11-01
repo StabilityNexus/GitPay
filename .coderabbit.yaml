@@ -103,6 +103,8 @@ reviews:
   tools:
     shellcheck:
       enabled: true
+    ruff:
+      enabled: true
     markdownlint:
       enabled: true
     github-checks:
@@ -114,21 +116,44 @@ reviews:
       level: default
     biome:
       enabled: true
+    hadolint:
+      enabled: true
+    swiftlint:
+      enabled: true
+    phpstan:
+      enabled: true
+      level: default
+    golangci-lint:
+      enabled: true
     yamllint:
       enabled: true
     gitleaks:
+      enabled: true
+    checkov:
+      enabled: true
+    detekt:
       enabled: true
     eslint:
       enabled: true
 
   # Apply the following labels to PRs
   labeling_instructions:
+    - label: Python Lang
+      instructions: Apply when the PR/MR contains changes to python source-code
+    - label: Solidity Lang
+      instructions: Apply when the PR/MR contains changes to solidity source-code
     - label: Typescript Lang
       instructions: Apply when the PR/MR contains changes to javascript or typescript source-code
+    - label: Ergoscript Lang
+      instructions: Apply when the PR/MR contains changes to ergoscript source-code
     - label: Bash Lang
       instructions: >-
         Apply when the PR/MR contains changes to shell-scripts or BASH code
         snippets
+    - label: Make Lang
+      instructions: >-
+        Apply when the PR/MR contains changes to the file `Makefile` or makefile
+        code snippets
     - label: Documentation
       instructions: >-
         Apply whenever project documentation (namely markdown source-code) is
@@ -155,87 +180,118 @@ reviews:
 
   # Custom review instructions for specific file patterns
   path_instructions:
-    # GitPay Action source — AGENTS.md is authoritative; these are its invariants
-    - path: "src/**/*.ts"
+    # TypeScript/JavaScript files
+    - path: "**/*.{ts,tsx,js,jsx}"
       instructions: |
-        GitPay is a GitHub Action that pays contributors from the adopter's Safe via the
-        AllowanceModule on Ethereum Sepolia. Read AGENTS.md; flag any change that breaks it.
+        NextJS:
+        - Ensure that "use client" is being used
+        - Ensure that only features that allow pure client-side rendering are used
+        - NextJS best practices (including file structure, API routes, and static generation methods) are used.
+      
+        TypeScript:
+        - Avoid 'any', use explicit types
+        - Prefer 'import type' for type imports
+        - Review for significant deviations from Google JavaScript style guide. Minor style issues are not a priority
+        - The code adheres to best practices associated with React
+        - The code adheres to best practices associated with React PWA
+        - The code adheres to best practices associated with SPA
+        - The code adheres to best practices recommended by lighthouse or similar tools for performance
+        - The code adheres to best practices associated with Node.js
+        - The code adheres to best practices recommended for performance
 
-        Money-path rules:
-        - Amounts are strings in atomic units. Flag any `number`, float, or `parseFloat` on an amount
-        - The idempotency key (src/core/idempotency.ts) must stay deterministic and must NOT include
-          `amount`, timestamps or comment IDs; the `xops:v1` prefix and `xops-receipt` marker must
-          not be renamed (I7)
-        - `AUTH_ALREADY_USED` is a success, never a failure (I8)
-        - The ledger receipt must be written with status=broadcasting BEFORE broadcast; flag any
-          reordering. Only bot / OWNER / MEMBER / COLLABORATOR receipts may be trusted
-        - Default mode is `dry-run`; an unknown mode must be refused, not treated as "not dry-run" (I5)
-        - No amount above `max_per_payout` may reach a driver (I10)
-        - Simulate (eth_call + eth_estimateGas) before broadcast; never fall back to a guessed gas limit
-        - Refuse, never queue, when the delegate already has a transaction pending
-        - Errors surface as codes from src/core/errors.ts, never stack traces in PR comments
-        - Every settlement path, including failures, writes STATUS, TX_HASH and EXPLORER_URL outputs
-        - The delegate key must never appear in logs, outputs, comments or error messages
+        Security:
+        - No exposed API keys or sensitive data
+        - Use expo-secure-store for sensitive storage
+        - Validate deep linking configurations
+        - Check for common security vulnerabilities such as:
+          - SQL Injection
+          - XSS (Cross-Site Scripting)
+          - CSRF (Cross-Site Request Forgery)
+          - Insecure dependencies
+          - Sensitive data exposure
 
-        Types: avoid `any`; prefer `import type`. Policy conditions are named constants, never an
-        expression language.
+        Internationalization:
+        - User-visible strings should be externalized to resource files (i18n)
 
-    # The layer boundary (THE ONE RULE, I1/I4/I6)
-    - path: "src/{core,adapters,resolvers}/**/*.ts"
+    # HTML files
+    - path: "**/*.html"
       instructions: |
-        These layers must stay chain-agnostic. Flag as a blocking issue any import of a chain
-        library (ethers, viem, @noble/*), a token or contract address, an RPC URL, a hash function
-        (keccak256), ABI encoding, or a branch on a specific network (`if (network === ...)`).
-        Core must never read fields inside `PaymentPayload.payload`. `Intent.recipient` stays an
-        opaque `string`, never `0x${string}`. `verify()` and policy evaluation make zero network calls.
+        Review the HTML code against the google html style guide and point out any mismatches. Ensure that:
+        - The code adheres to best practices recommended by lighthouse or similar tools for performance
 
-    # Drivers — the only layer that knows rails
-    - path: "src/drivers/**/*.ts"
+    # CSS files
+    - path: "**/*.css"
       instructions: |
-        Flag any second entry in src/drivers/chains.ts or any new driver: Ethereum Sepolia is the
-        only supported network until the release gate in REFERENCES.md §2.4. Network-derived values
-        (chainId, AllowanceModule address, explorer) belong in chains.ts. A driver must declare
-        `nativeReplayProtection`; `safe-allowance` must keep `needsSecret: true` (do not "fix" I3).
-        ABI encoding, RLP and EIP-1559 signing are hand-written on @noble — check them against
-        test/vectors and flag changes to golden vectors without justification.
+        Review the CSS code against the google css style guide and point out any mismatches. Ensure that:
+        - The code adheres to best practices associated with CSS.
+        - The code adheres to best practices recommended by lighthouse or similar tools for performance.
+        - The code adheres to similar naming conventions for classes, ids.
 
-    # Runtime dependencies (I11, I13)
-    - path: "package.json"
+    # Python files
+    - path: "**/*.{py}"
       instructions: |
-        Runtime `dependencies` must be at most 2 packages, exact-pinned (currently @noble/curves and
-        @noble/hashes). Flag any addition of ethers, viem, thirdweb or @x402/* to runtime deps, and
-        any range specifier (^, ~) on a runtime dependency.
+        Python:
+        - Check for major PEP 8 violations and Python best practices. 
 
-    # Marketing site — not part of the Action
-    - path: "frontend/**/*.{ts,tsx}"
+    # Solidity Smart Contract files
+    - path: "**/*.sol"
       instructions: |
-        Static React + Vite marketing site deployed to GitHub Pages; it is not part of the Action.
-        Review for React best practices, accessibility, and performance. It must never import from
-        ../src or handle keys or funds.
+        Solidity:
+        - Review the Solidity contracts for security vulnerabilities and adherence to best practices.
+        - Ensure immutability is used appropriately (e.g., `immutable` and `constant` where applicable).
+        - Ensure there are no unbounded loops that could lead to gas exhaustion.
+        - Verify correct and explicit visibility modifiers for all state variables and functions.
+        - Flag variables that are declared but used only once or are unnecessary.
+        - Identify potential gas optimization opportunities without compromising readability or security.
+        - Verify that any modification to contract logic includes corresponding updates to automated tests.
+        - Ensure failure paths and revert scenarios are explicitly handled and validated.
+        - Validate proper access control enforcement (e.g., Ownable, RBAC, role checks).
+        - Ensure consistent and correct event emission for all state-changing operations.
+        - Confirm architectural consistency with existing contracts (no unintended storage layout changes unless clearly documented).
+        - Flag major feature additions or architectural changes that were implemented without prior design discussion (if applicable).
+        - Flag pull requests that mix unrelated changes or multiple concerns in a single submission.
+        - Ensure security-sensitive logic changes are not introduced without adequate test coverage.
+        - Review for common smart contract vulnerabilities, including but not limited to:
+            - Reentrancy
+            - Improper input validation
+            - Access control bypass
+            - Integer overflows/underflows (if using unchecked blocks)
+            - Front-running risks where applicable
+
 
     # Javascript/Typescript test files
     - path: "**/*.test.{ts,tsx,js,jsx}"
       instructions: |
         Review test files for:
-        - Comprehensive coverage of behavior, including edge cases and error paths
+        - Comprehensive coverage of component behavior
+        - Proper use of @testing-library/react-native
         - Async behavior is properly tested
+        - Accessibility testing is included
         - Test descriptions are sufficiently detailed to clarify the purpose of each test
-        - The tests are not tautological
+        - The tests are not tautological 
 
-    # YAML files — GitHub Actions workflows, action.yml, dependabot/socket/goreleaser config, issue templates
-    - path: "**/*.{yml,yaml}"
+    # Solidity test files
+    - path: "**/*.test.{sol}"
       instructions: |
-        GitHub Actions workflows (.github/workflows/**):
-        - `permissions` should be scoped to the minimum the job needs — flag blanket `write-all` or a missing `permissions` block on a workflow that writes anything
-        - Third-party actions must be pinned to a full commit SHA
-        - `pull_request_target` combined with checking out and executing the PR's own branch code is a known secret-exfiltration risk — flag it
-        - Secrets must never be echoed, logged, or interpolated into a shell command built from untrusted input (PR titles/bodies, branch names, issue comments)
-        - Preserve this project's zero-secrets-by-default posture — flag any change that adds a required `secrets:` entry to the default/adopter-facing path (see AGENTS.md and REFERENCES.md §8)
+        Review test files for:
+        - Comprehensive coverage of contract behavior.
+        - Coverage of success paths, edge cases, and failure/revert scenarios.
+        - Proper validation of access control restrictions.
+        - Verification of event emissions where applicable.
+        - Explicit validation of state changes after each relevant function call.
+        - Adequate test updates whenever contract logic is modified.
+        - Deterministic behavior (tests should not rely on implicit execution order or shared mutable state).
+        - Clear and descriptive test names that reflect the intended behavior being validated.
 
-        General YAML hygiene:
-        - Consistent indentation (2 spaces), no tabs
-        - No duplicate keys
-        - Prefer explicit quoting for ambiguous scalars (e.g. `on`, `yes`, `no`, version-looking strings) to avoid YAML 1.1 type-coercion surprises
+
+    # Asset files (images, fonts, etc.)
+    - path: "assets/**/*"
+      instructions: |
+        Review asset files for:
+        - Image optimization (appropriate size and format)
+        - Proper @2x and @3x variants for different screen densities
+        - SVG assets are optimized
+        - Font files are licensed and optimized
 
     # Dependency manifest and lock files (e.g. updated by Dependabot, Renovate)
     - path: >-

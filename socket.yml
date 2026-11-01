@@ -4,11 +4,19 @@ version: 2
 projectIgnorePaths:
   - "build"
   - "dist"
+  - ".dart_tool"
+  - "android/.gradle"
 
 # Only rescan PRs when dependency manifests actually change
 triggerPaths:
   - "package.json"
   - "package-lock.json"
+  - "pnpm-lock.yaml"
+  - "yarn.lock"
+  - "requirements.txt"
+  - "pyproject.toml"
+  - "pubspec.yaml"      # Flutter
+  - "pubspec.lock"
 
 githubApp:
   enabled: true
