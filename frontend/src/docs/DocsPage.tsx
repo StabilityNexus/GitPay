@@ -742,7 +742,7 @@ export function DocsPage() {
           </section>
 
           <footer>
-            <span>GitPay · an AOSSIE / Stability Nexus project · MIT</span>
+            <span>GitPay · an AOSSIE / Stability Nexus project · GPL-3.0</span>
             <span>
               <a href="https://github.com/StabilityNexus/GitPay/issues" target="_blank" rel="noopener">
                 Report a problem with these docs
