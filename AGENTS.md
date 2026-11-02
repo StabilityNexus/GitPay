@@ -10,15 +10,18 @@ way; this file records *what* it is.
 
 A CI/CD-native value transfer engine. A repository event produces a payment intent, the
 adopter's declared policy approves or refuses it, the workflow settles it from the adopter's own
-Safe, and a receipt is posted back.
+funds — a Safe, or an ordinary wallet such as MetaMask — and a receipt is posted back.
 
-Settlement runs on the **Safe AllowanceModule**. The maintainer sets up once — a Safe holding the
+There are two settlement rails. Both put a bounded delegate key in CI; they differ in where the
+funds sit and how the bound is set.
+
+**`allowance` (default) — from a Safe.** Settlement runs on the **Safe AllowanceModule**. The maintainer sets up once — a Safe holding the
 payout token, a period-capped allowance for a delegate address, and a little native gas for that
 delegate — and after that **does nothing per payout**. CI holds the delegate key and calls
 `executeAllowanceTransfer`; the Safe pays the recipient directly. The single optimization target
 is **"maintainer does less"** (`DECISION-LOG.md` §4–§5).
 
-There is a second, simpler rail for adopters who have no Safe: **`approve`**. The maintainer
+**`approve` — from an ordinary wallet, for adopters who have no Safe.** The maintainer
 calls `approve(delegate, N)` on the token from an ordinary wallet — MetaMask, Rabby, a hardware
 wallet — and CI calls `transferFrom(wallet, recipient, amount)`. Same delegate-key model, same
 ledger, no Safe. The trade: an ERC-20 allowance does not reset, so the maintainer tops it up by
@@ -58,16 +61,16 @@ count. If a feature requires us to run something, it is out of scope or it is Ti
 ```
 L5 RECEIPT       SettlementResponse → PR comment, which is also the ledger
 L4 SETTLEMENT    driver registry: (scheme × network) → driver   ← only layer that knows rails
-L3 AUTHORITY     the Safe allowance, granted once on-chain and capped per period
+L3 AUTHORITY     an on-chain allowance granted once: Safe spending limit, or ERC-20 approve
 L2 INTENT        PaymentRequirements — what moves, to whom
 L1 POLICY        offline gates, no network
 L0 TRIGGER       repo event → Intent
 ```
 
-L3 is not a per-payout signature. The maintainer authorized the delegate once, in Safe{Wallet};
-each payout is authorized by L1 policy (a maintainer's `/send`, the cap, the kill switch) and
-bounded by the module's period cap. `PaymentPayload.payload` is empty for the `allowance`
-scheme.
+L3 is not a per-payout signature. The maintainer authorized the delegate once — a spending
+limit in Safe{Wallet}, or an `approve` from their wallet; each payout is authorized by L1 policy
+(a maintainer's `/send`, the cap, the kill switch) and bounded on-chain by the module's period
+cap or the remaining ERC-20 allowance. `PaymentPayload.payload` is empty for both schemes.
 
 ### THE ONE RULE
 
@@ -95,7 +98,7 @@ Only the driver owning that scheme may.
 | ID | Rule |
 |---|---|
 | I1 | Core, adapters and resolvers import no chain libs or chain primitives (lint + CI grep) |
-| I2 | **GitPay never holds, pools, or routes funds.** No GitPay-operated account exists. The Safe pays the recipient directly |
+| I2 | **GitPay never holds, pools, or routes funds.** No GitPay-operated account exists. The adopter's Safe or wallet pays the recipient directly |
 | I3 | Drivers with `needsSecret \|\| custodial` cannot register in Tier 0 — registry throws |
 | I4 | `Intent.recipient` is an opaque `string`, resolved by a resolver. Never `` `0x${string}` `` |
 
@@ -329,7 +332,8 @@ them, and do not add the networks themselves.
 - Anything that is a **function of the network** — `chainId`, the AllowanceModule address,
   the explorer base — comes from the chain registry in `src/drivers/chains.ts`, never from a
   workflow input restating what `network` already says. An explicit input still overrides.
-  Only adopter-specific values stay in the workflow: `rpc_url`, `safe`, `token`, `delegate_key`.
+  Only adopter-specific values stay in the workflow: `rpc_url`, `safe` (`allowance`) or `payer`
+  (`approve`), `token`, `delegate_key`.
 - Errors are codes from `src/core/errors.ts`. Never surface a stack trace in a PR comment.
 - Every settlement path writes `STATUS`, `TX_HASH` and `EXPLORER_URL` to `GITHUB_OUTPUT`,
   including on failure paths.
@@ -357,10 +361,11 @@ them, and do not add the networks themselves.
 
 ## Security posture
 
-- **The period cap is the real bound.** `max_per_payout` stops a single bad command; the Safe's
-  allowance stops a leaked key. Both are needed and neither replaces the other.
+- **The on-chain allowance is the real bound.** `max_per_payout` stops a single bad command; the
+  Safe's period cap (`allowance`) or the remaining ERC-20 allowance (`approve`) stops a leaked
+  key. Both are needed and neither replaces the other.
 - **Simulate before broadcast** (`eth_call` + `eth_estimateGas`). Catches an exhausted
-  allowance, a missing delegate, an empty Safe and a paused token for zero gas. No guessed gas
+  allowance, a missing delegate, an empty Safe or wallet and a paused token for zero gas. No guessed gas
   fallback — a failed estimate after a passing simulation is an error, not a reason to guess.
 - **The ledger is written before broadcast.** A broadcast with no record is how a re-run pays
   twice.
@@ -376,8 +381,8 @@ them, and do not add the networks themselves.
 
 ## Scope
 
-**In (v1.0.0):** **Ethereum Sepolia only** · GitHub adapter · Safe AllowanceModule driver ·
-ERC-20 `approve` driver (after v1.0.0, same network) ·
+**In (v1.x):** **Ethereum Sepolia only** · GitHub adapter · Safe AllowanceModule driver ·
+ERC-20 `approve` driver for ordinary wallets (added after v1.0.0, same network) ·
 receipt-comment ledger · inline-address resolver · declared policy · machine-readable receipts
 and outputs.
 

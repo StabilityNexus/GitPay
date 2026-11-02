@@ -164,8 +164,10 @@ Use each term for one thing only:
 | **adopter** | The maintainer or organization running GitPay in their own repository |
 | **recipient** | Whoever is paid. Not "contributor" in technical text — a recipient may be an agent or a non-GitHub identity |
 | **payout** | One transfer to one recipient. Multi-recipient means N payouts, not a "batch" |
-| **delegate** | The address whose key CI holds, authorized by the Safe's allowance |
-| **allowance** / **period cap** | The on-chain spending limit for the delegate, reset each period |
+| **delegate** | The address whose key CI holds, authorized by the Safe's spending limit or the wallet's `approve` |
+| **allowance** | The on-chain amount the delegate may spend: a Safe spending limit, or an ERC-20 `approve` |
+| **period cap** | The Safe spending limit's per-period amount, reset each period. An ERC-20 `approve` has none |
+| **payer** | The ordinary wallet that pays under `scheme: approve`, in place of a Safe |
 | **receipt** | The PR comment GitPay posts after a payout. The receipts together are the **ledger** |
 | **policy** | The adopter's declared rules: `enabled`, `allowed_associations`, `max_per_payout` |
 | **dry run** (noun) / `dry-run` (the mode value) | The default: policy runs, nothing moves |
@@ -179,8 +181,8 @@ way `AGENTS.md` does: short declarative sentences, the mechanism stated, the lim
   "Set up once in Safe{Wallet}, then pay with a comment" beats any list of features.
 - **"GitPay is an artifact, not a service"** — the core claim. Use this exact phrase. GitPay
   runs in the adopter's CI; there is no GitPay server, account or fee.
-- **"Never holds, pools or routes funds"** — the custody claim. The adopter's Safe pays the
-  recipient directly.
+- **"Never holds, pools or routes funds"** — the custody claim. The adopter's Safe or wallet
+  pays the recipient directly.
 - **State the delegate key honestly.** GitPay puts a key in CI on purpose. Say "the key's
   authority is bounded on-chain and revocable". Never say "no keys in CI", "keyless" or
   "zero risk".
