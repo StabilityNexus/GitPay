@@ -101,7 +101,7 @@ rationale and the CI-enforced invariants (I1–I13).
 ```
 L5 RECEIPT       SettlementResponse → PR comment + machine-readable receipt
 L4 SETTLEMENT    driver registry: (scheme × network) → driver   ← only layer that knows rails
-L3 AUTHORIZATION PaymentPayload — who approved, cryptographically
+L3 AUTHORITY     an on-chain allowance granted once: Safe spending limit, or ERC-20 approve
 L2 INTENT        PaymentRequirements — what moves, to whom
 L1 POLICY        offline gates, no network
 L0 TRIGGER       repo event → Intent

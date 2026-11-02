@@ -207,7 +207,9 @@ Every box, no exceptions. Multi-network work does not start until this is a tagg
 **Custody, stated honestly.** This gate does not claim the operator holds no key. It claims the
 key's authority is bounded on-chain and revocable: the delegate can move at most one period's
 allowance, to any address it chooses, until a Safe owner removes it. Size the period cap at what
-you can afford to lose in one period. `DECISION-LOG.md` §6a has the full blast-radius reading.
+you can afford to lose in one period. Under `scheme: approve` (added after `v1.0.0`) the bound is
+the remaining ERC-20 allowance, which does not refill: a leaked key can spend what is left, once,
+until `approve(delegate, 0)`. `DECISION-LOG.md` §6a has the full blast-radius reading.
 
 **Never cut**, whatever else slips: golden vectors · offline verify · the replay test · the I1
 lint · the dry-run default · the tier gate · this gate itself. Those are what make the claim
@@ -524,7 +526,9 @@ code.
     allowed_associations: OWNER,MEMBER,COLLABORATOR
     max_per_payout: "5"               # I10, in /send units: 5 USDC
     rpc_url: ${{ secrets.GITPAY_RPC_URL }}
-    safe: "0x…"
+    safe: "0x…"                       # scheme: allowance (default)
+    # scheme: approve                 # pay from an ordinary wallet instead of a Safe
+    # payer: "0x…"                    # the wallet that approved the delegate; replaces safe
     token: "0x…"
     delegate_key: ${{ secrets.GITPAY_DELEGATE_KEY }}
     pr: ${{ github.event.issue.number }}
