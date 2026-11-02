@@ -92,12 +92,6 @@ secrets required in the default configuration.
 
 ---
 
-## 🔗 Repository Links
-
-- [Main Repository](https://github.com/StabilityNexus/GitPay)
-
----
-
 ## 🏗️ Architecture
 
 Six layers, one rule: nothing in `src/core/**` or `src/adapters/**` may import a chain library,
