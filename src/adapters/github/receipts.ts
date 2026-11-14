@@ -229,11 +229,16 @@ export class PullRequestReceiptLedger implements SettlementLedger {
   async lookup(key: string): Promise<LedgerEntry | undefined> {
     const writers = new Map<string, Promise<boolean>>();
     const unvouched: string[] = [];
+    const candidates: CommentLike[] = [];
     for (let page = 1; page <= 20; page += 1) {
       const batch = await githubJson(`${this.base()}?per_page=100&page=${page}`, this.ref.token);
-      const found = findReceipt(await this.vouched(batch, key, writers, unvouched), key);
-      if (found) return found;
-      if (batch.length < 100) return this.refuseUnvouched(key, unvouched);
+      candidates.push(...(await this.vouched(batch, key, writers, unvouched)));
+      const found = findReceipt(candidates, key);
+      if (found?.status === "settled") return found;
+      if (batch.length < 100) {
+        if (found) return found;
+        return this.refuseUnvouched(key, unvouched);
+      }
     }
     // Bailing out silently would mean paying twice on a very long thread.
     throw new Error(
