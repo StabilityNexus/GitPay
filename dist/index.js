@@ -610,13 +610,18 @@ class PullRequestReceiptLedger {
     async lookup(key) {
         const writers = new Map();
         const unvouched = [];
+        const candidates = [];
         for (let page = 1; page <= 20; page += 1) {
             const batch = await githubJson(`${this.base()}?per_page=100&page=${page}`, this.ref.token);
-            const found = findReceipt(await this.vouched(batch, key, writers, unvouched), key);
-            if (found)
+            candidates.push(...(await this.vouched(batch, key, writers, unvouched)));
+            const found = findReceipt(candidates, key);
+            if (found?.status === "settled")
                 return found;
-            if (batch.length < 100)
+            if (batch.length < 100) {
+                if (found)
+                    return found;
                 return this.refuseUnvouched(key, unvouched);
+            }
         }
         // Bailing out silently would mean paying twice on a very long thread.
         throw new Error(`Could not scan all comments on ${this.ref.repo}#${this.ref.number} for a receipt; refusing to settle`);

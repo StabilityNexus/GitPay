@@ -216,3 +216,42 @@ test("GitPay's own bot receipts and unrelated comments cost no permission lookup
   assert.equal((await ledger().lookup(KEY))?.status, "settled");
   assert.deepEqual(looked, []);
 });
+
+test("lookup scans across pages so a later settled confirmation beats an earlier broadcasting record", async () => {
+  const broadcasting = formatReceipt({ key: KEY, status: "broadcasting", transaction: "0xabc" });
+  const settled = formatReceipt({ key: KEY, status: "settled", transaction: "0xabc", settledAt: "2026-09-06T00:00:00Z" });
+
+  const page1 = Array.from({ length: 99 }, (_, i) => ({ body: `discussion comment ${i}`, ...BOT }));
+  page1.push({ body: broadcasting, ...BOT });
+  const page2 = [{ body: settled, ...BOT }];
+
+  globalThis.fetch = ((url: unknown) => {
+    const page = new URL(String(url)).searchParams.get("page");
+    if (page === "1") return Promise.resolve(new Response(JSON.stringify(page1)));
+    if (page === "2") return Promise.resolve(new Response(JSON.stringify(page2)));
+    return Promise.resolve(new Response("[]"));
+  }) as typeof fetch;
+
+  const found = await ledger().lookup(KEY);
+  assert.equal(found?.status, "settled");
+  assert.equal(found?.transaction, "0xabc");
+});
+
+test("lookup returns broadcasting record when no settled confirmation appears across pages", async () => {
+  const broadcasting = formatReceipt({ key: KEY, status: "broadcasting", transaction: "0xabc" });
+
+  const page1 = Array.from({ length: 99 }, (_, i) => ({ body: `discussion comment ${i}`, ...BOT }));
+  page1.push({ body: broadcasting, ...BOT });
+  const page2 = [{ body: "later discussion", ...BOT }];
+
+  globalThis.fetch = ((url: unknown) => {
+    const page = new URL(String(url)).searchParams.get("page");
+    if (page === "1") return Promise.resolve(new Response(JSON.stringify(page1)));
+    if (page === "2") return Promise.resolve(new Response(JSON.stringify(page2)));
+    return Promise.resolve(new Response("[]"));
+  }) as typeof fetch;
+
+  const found = await ledger().lookup(KEY);
+  assert.equal(found?.status, "broadcasting");
+  assert.equal(found?.transaction, "0xabc");
+});
